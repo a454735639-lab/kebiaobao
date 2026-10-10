@@ -6,12 +6,10 @@ struct HomeView: View {
     @State private var sheet: HomeSheet?
 
     enum HomeSheet: Identifiable, Hashable {
-        case baby, newBaby, addCourse, checkIn(LessonTemplate, Date), ledger
+        case addCourse, checkIn(LessonTemplate, Date), ledger
         case manual(LessonTemplate, Date, Store.ManualOp)
         var id: String {
             switch self {
-            case .baby: return "baby"
-            case .newBaby: return "newbaby"
             case .addCourse: return "add"
             case .checkIn(let t, let d): return "ci-\(t.id)-\(d.timeIntervalSince1970)"
             case .manual(let t, let d, let op): return "mn-\(t.id)-\(d.timeIntervalSince1970)-\(op)"
@@ -40,8 +38,6 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $sheet) { s in
                 switch s {
-                case .baby: BabyEditorView(baby: store.currentBaby)
-                case .newBaby: BabyEditorView(baby: nil)
                 case .addCourse: CourseEditorView(course: nil)
                 case .checkIn(let t, let d): CheckInSheet(template: t, date: d)
                 case .manual(let t, let d, let op):
@@ -72,8 +68,9 @@ struct HomeView: View {
                     }
                 }
                 Divider()
-                Button { sheet = .newBaby } label: { Label("添加宝贝", systemImage: "person.badge.plus") }
-                Button { sheet = .baby } label: { Label("编辑当前宝贝档案", systemImage: "square.and.pencil") }
+                NavigationLink { BabyManageView() } label: {
+                    Label("宝贝管理", systemImage: "person.2")
+                }
             } label: {
                 HStack(spacing: 8) {
                     ZStack {

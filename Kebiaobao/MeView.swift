@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 
 struct MeView: View {
     @EnvironmentObject var store: Store
-    @State private var sheet: MeSheet?
     @State private var showImport = false
     @State private var showAppearance = false
     @AppStorage("kb.appearance") private var appearance = KBAppearance.system.rawValue
@@ -12,17 +11,6 @@ struct MeView: View {
     @State private var showPicker = false
     @State private var shareItem: ShareItem?
     @State private var toast: String?
-
-    enum MeSheet: Identifiable {
-        case baby, newBaby, addCourse
-        var id: String {
-            switch self {
-            case .baby: return "b"
-            case .newBaby: return "nb"
-            case .addCourse: return "c"
-            }
-        }
-    }
 
     var body: some View {
         NavigationStack {
@@ -33,14 +21,14 @@ struct MeView: View {
                         profileCard
                         statCard
                         group("数据管理") {
-                            row("person.crop.circle", "宝贝管理", "编辑当前宝贝档案") { sheet = .baby }
-                            row("person.badge.plus", "添加宝贝", "新增一个宝贝档案") { sheet = .newBaby }
-                            row("book.closed", "课程管理", "新增课程、续费记录") { sheet = .addCourse }
+                            navBaby()
+                            navCourse()
                             row("plus.circle.fill", "手动记账", "不限日期，直接加／扣课时") {
                                 showManual = true
                             }
                             navLedger()
-                            navAnalytics()                        }
+                            navAnalytics()
+                        }
                         group("外观") {
                             row("moon.stars", "深色模式",
                                 KBAppearance(rawValue: appearance)?.title ?? "跟随系统") {
@@ -75,13 +63,6 @@ struct MeView: View {
                 }
                 .padding(.horizontal, 20).padding(.vertical, 10)
                 .background(KB.bg)
-            }
-            .sheet(item: $sheet) { s in
-                switch s {
-                case .baby: BabyEditorView(baby: store.currentBaby)
-                case .newBaby: BabyEditorView(baby: nil)
-                case .addCourse: CourseEditorView(course: nil)
-                }
             }
             .sheet(isPresented: $showImport) { importSheet }
             .sheet(item: $shareItem) { item in
@@ -132,10 +113,11 @@ struct MeView: View {
                     }
                 }
                 Spacer()
-                Button { sheet = .baby } label: {
+                NavigationLink { BabyManageView() } label: {
                     Image(systemName: "pencil")
                         .font(.system(size: 14)).foregroundStyle(KB.dim)
                 }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -173,6 +155,34 @@ struct MeView: View {
                 Image(systemName: icon)
                     .font(.system(size: 15)).foregroundStyle(KB.accent)
                     .frame(width: 26)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
+                    Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(KB.line)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 13)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func navBaby() -> some View {
+        navRow("person.2", "宝贝管理", "查看、添加、编辑宝贝档案") { BabyManageView() }
+    }
+
+    private func navCourse() -> some View {
+        navRow("book.closed", "课程管理", "查看、新增、编辑课程") { CourseManageView() }
+    }
+
+    @ViewBuilder
+    private func navRow<D: View>(_ icon: String, _ title: String, _ sub: String,
+                                 @ViewBuilder dest: () -> D) -> some View {
+        NavigationLink { dest() } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
                     Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
