@@ -44,9 +44,10 @@ struct HomeView: View {
                 case .checkIn(let t, let d): CheckInSheet(template: t, date: d)
                 case .manual(let t, let d, let op):
                     if s == .manual(t, d, op) {
-                        ManualEntryEditorView(preset: (t.courseID, op, t.deduct, d)) {
-                            sheet = nil
-                        }
+                        ManualEntryEditorView(
+                            preset: (t.courseID, op, t.deduct, d),
+                            onDone: { sheet = nil }
+                        )
                     } else {
                         EmptyView()
                     }

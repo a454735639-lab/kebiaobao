@@ -160,7 +160,7 @@ final class Store: ObservableObject {
         save()
     }
 
-    private static func manualDefaultNote(_ op: ManualOp) -> String {
+    static func manualDefaultNote(_ op: ManualOp) -> String {
         switch op {
         case .consume: return "手动扣课时"
         case .leave:   return "请假（不扣课时）"

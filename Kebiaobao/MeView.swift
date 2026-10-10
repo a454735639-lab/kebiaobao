@@ -4,6 +4,7 @@ struct MeView: View {
     @EnvironmentObject var store: Store
     @State private var sheet: MeSheet?
     @State private var showImport = false
+    @State private var showManual = false
     @State private var importText = ""
     @State private var toast: String?
 
@@ -63,7 +64,9 @@ struct MeView: View {
                 }
             }
             .sheet(isPresented: $showImport) { importSheet }
-            .sheet(isPresented: $showManual) { ManualEntryEditorView(onDone: { showManual = false }) }
+            .sheet(isPresented: $showManual) {
+                ManualEntryEditorView(preset: nil, onDone: { showManual = false })
+            }
             .alert("提示", isPresented: Binding(
                 get: { toast != nil },
                 set: { if !$0 { toast = nil } }
