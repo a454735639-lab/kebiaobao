@@ -45,14 +45,46 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
     var id = UUID()
     var courseID: UUID
     var weekdays: [Int]          // 1=周日 … 7=周六
-    var hour: Int
+    var hour: Int                // 兼容旧数据；新数据取 slots
     var minute: Int
     var place: String
     var teacher: String
     var deduct: Int              // 每次划扣课时
     var remindMinutes: Int       // 提前提醒分钟
+    /// 每个星期几单独的时间／老师／地点。空则回退到上面的 hour/minute/teacher/place
+    var slots: [DaySlot] = []
 
     var timeText: String { String(format: "%02d:%02d", hour, minute) }
+
+    /// 取某天的具体安排；没有专属 slot 时用模板默认值
+    func slot(for weekday: Int) -> DaySlot {
+        slots.first { $0.weekday == weekday }
+            ?? DaySlot(weekday: weekday, hour: hour, minute: minute,
+                       teacher: teacher, place: place)
+    }
+
+    /// 按星期排序的全部安排
+    var orderedSlots: [DaySlot] { weekdays.sorted().map { slot(for: $0) } }
+
+    /// 是否每天都用同一套时间/老师
+    var isUniform: Bool {
+        let s = orderedSlots
+        guard let f = s.first else { return true }
+        return s.allSatisfy { $0.hour == f.hour && $0.minute == f.minute && $0.teacher == f.teacher }
+    }
+}
+
+/// 某个星期几的上课安排
+struct DaySlot: Identifiable, Codable, Hashable {
+    var id = UUID()
+    var weekday: Int             // 1=周日 … 7=周六
+    var hour: Int
+    var minute: Int
+    var teacher: String
+    var place: String
+
+    var timeText: String { String(format: "%02d:%02d", hour, minute) }
+    var dayName: String { KBDate.weekdayName(weekday) }
 }
 
 struct LedgerEntry: Identifiable, Codable, Hashable {

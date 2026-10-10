@@ -27,8 +27,8 @@ struct MeView: View {
                             row("plus.circle.fill", "手动记账", "不限日期，直接加／扣课时") {
                                 showManual = true
                             }
-                            row("list.bullet.rectangle", "课时流水", "查看扣费／充值明细") { navLedger() }
-                            row("chart.bar.xaxis", "数据分析", "消耗统计与支出估算") { navAnalytics() }
+                            navLedger()
+                            navAnalytics()
                         }
                         group("备份与恢复") {
                             row("square.and.arrow.up", "导出备份", "复制 JSON 保存") { exportBackup() }

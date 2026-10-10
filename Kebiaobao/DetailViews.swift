@@ -114,14 +114,23 @@ struct CourseDetailView: View {
                     Text("暂无排课").font(.system(size: 13)).foregroundStyle(KB.dim)
                 } else {
                     ForEach(items) { t in
-                        HStack(spacing: 10) {
-                            Text(t.weekdays.map { KBDate.weekdayName($0) }.joined(separator: "、"))
-                                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.text)
-                            Text(t.timeText)
-                                .font(.system(size: 13)).foregroundStyle(KB.accent)
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(t.orderedSlots) { s in
+                                HStack(spacing: 10) {
+                                    Text(s.dayName)
+                                        .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.text)
+                                    Text(s.timeText)
+                                        .font(.system(size: 13)).foregroundStyle(KB.accent)
+                                    Spacer()
+                                    Text("\(s.teacher.isEmpty ? "—" : s.teacher) · \(s.place.isEmpty ? "—" : s.place)")
+                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                }
+                            }
+                        }
+                        HStack {
+                            Text("每次划扣 \(t.deduct) 课时")
+                                .font(.system(size: 11)).foregroundStyle(KB.dim)
                             Spacer()
-                            Text("\(t.teacher.isEmpty ? "—" : t.teacher) · \(t.place.isEmpty ? "—" : t.place)")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
                             Button {
                                 store.templates.removeAll { $0.id == t.id }
                                 store.save()
@@ -130,7 +139,7 @@ struct CourseDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 4)
                     }
                 }
             }

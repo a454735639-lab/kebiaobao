@@ -162,9 +162,10 @@ struct ScheduleView: View {
 
     private func row(_ t: LessonTemplate) -> some View {
         let c = store.course(t.courseID)
+        let s = t.slot(for: KBDate.cal.component(.weekday, from: selected))
         return HStack(spacing: 12) {
             VStack(spacing: 2) {
-                Text(t.timeText)
+                Text(s.timeText)
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.accent)
                 Text("\(t.deduct)节").font(.system(size: 10)).foregroundStyle(KB.dim)
             }
@@ -174,7 +175,7 @@ struct ScheduleView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(c?.name ?? "课程")
                     .font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                Text([t.teacher, t.place].filter { !$0.isEmpty }.joined(separator: " · "))
+                Text([s.teacher, s.place].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             Spacer()
@@ -444,11 +445,12 @@ struct CheckInSheet: View {
             ZStack {
                 KB.bg.ignoresSafeArea()
                 VStack(spacing: 14) {
+                    let sl = template.slot(for: KBDate.cal.component(.weekday, from: date))
                     Card {
                         VStack(spacing: 12) {
                             InfoRow(label: "课程", value: store.course(template.courseID)?.name ?? "—")
-                            InfoRow(label: "时间", value: "\(KBDate.mdhm.string(from: date).prefix(10)) \(template.timeText)")
-                            InfoRow(label: "老师", value: template.teacher.isEmpty ? "—" : template.teacher)
+                            InfoRow(label: "时间", value: "\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
+                            InfoRow(label: "老师", value: sl.teacher.isEmpty ? "—" : sl.teacher)
                             InfoRow(label: "剩余",
                                     value: "\(store.course(template.courseID).map { store.remaining($0) } ?? 0) 节")
                         }

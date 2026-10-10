@@ -92,14 +92,17 @@ final class Store: ObservableObject {
         return Double(remaining(c)) * c.pricePerLesson
     }
 
-    /// 某天的课（展开排课模板）
+    /// 某天的课（展开排课模板），按当天的实际时间排序
     func lessons(on date: Date, babyID: UUID?) -> [LessonTemplate] {
         let w = KBDate.cal.component(.weekday, from: date)
         return templates.filter { t in
             t.weekdays.contains(w) &&
             (babyID == nil || course(t.courseID)?.babyID == babyID) &&
             (course(t.courseID)?.archived == false)
-        }.sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+        }.sorted {
+            let a = $0.slot(for: w), b = $1.slot(for: w)
+            return (a.hour, a.minute) < (b.hour, b.minute)
+        }
     }
 
     /// 未来 N 天内有课的日期集合

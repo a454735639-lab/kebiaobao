@@ -178,20 +178,21 @@ struct HomeView: View {
 
     private func lessonRow(_ t: LessonTemplate, date: Date) -> some View {
         let c = store.course(t.courseID)
+        let s = t.slot(for: KBDate.cal.component(.weekday, from: date))
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(c?.name ?? "课程")
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                Text(t.timeText)
+                Text(s.timeText)
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.accent)
                 Spacer()
                 Text("剩余 \(c.map { store.remaining($0) } ?? 0) 节")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             HStack(spacing: 10) {
-                Label(t.teacher.isEmpty ? "—" : t.teacher, systemImage: "person")
+                Label(s.teacher.isEmpty ? "—" : s.teacher, systemImage: "person")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
-                Label(t.place.isEmpty ? "—" : t.place, systemImage: "mappin.and.ellipse")
+                Label(s.place.isEmpty ? "—" : s.place, systemImage: "mappin.and.ellipse")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             HStack(spacing: 10) {
