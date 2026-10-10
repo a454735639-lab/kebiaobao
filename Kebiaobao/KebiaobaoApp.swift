@@ -40,6 +40,7 @@ struct RootView: View {
     @EnvironmentObject var store: Store
     @Environment(\.colorScheme) private var scheme
     @State private var tab = 0
+    @State private var holidayTick = 0
 
     var body: some View {
         TabView(selection: $tab) {

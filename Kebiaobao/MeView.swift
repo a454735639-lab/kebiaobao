@@ -9,6 +9,7 @@ struct MeView: View {
     @State private var showManual = false
     @State private var importText = ""
     @State private var toast: String?
+    @State private var holidayBusy = false
 
     enum MeSheet: Identifiable {
         case baby, newBaby, addCourse
