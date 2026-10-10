@@ -9,7 +9,6 @@ struct MeView: View {
     @State private var showManual = false
     @State private var importText = ""
     @State private var toast: String?
-    @State private var holidayBusy = false
 
     enum MeSheet: Identifiable {
         case baby, newBaby, addCourse
@@ -39,8 +38,7 @@ struct MeView: View {
                             }
                             navLedger()
                             navAnalytics()
-                            holidayRow
-                        }
+                            holidayRow                        }
                         group("外观") {
                             row("moon.stars", "深色模式",
                                 KBAppearance(rawValue: appearance)?.title ?? "跟随系统") {
@@ -182,45 +180,25 @@ struct MeView: View {
     }
 
     @ViewBuilder
-    /// 节假日数据状态行：显示覆盖年份 + 上次同步时间，可手动更新
+    /// 节假日数据状态行（纯本地，无联网）
     private var holidayRow: some View {
-        Button {
-            guard !holidayBusy else { return }
-            holidayBusy = true
-            Task {
-                let ok = await Holiday.forceRefresh()
-                if ok { NotificationCenter.default.post(name: .kbHolidaysUpdated, object: nil) }
-                toast = ok ? "节假日已更新" : "更新失败，已沿用本地数据"
-                holidayBusy = false
+        HStack(spacing: 12) {
+            Image(systemName: "calendar.badge.checkmark")
+                .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("节假日数据").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
+                Text(holidayStatus).font(.system(size: 11)).foregroundStyle(KB.dim)
             }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("节假日数据").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text(holidayStatus).font(.system(size: 11)).foregroundStyle(KB.dim)
-                }
-                Spacer()
-                if holidayBusy {
-                    ProgressView().scaleEffect(0.8)
-                } else {
-                    Text("更新").font(.system(size: 13)).foregroundStyle(KB.accent)
-                }
-            }
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+            Spacer()
+            Text("内置").font(.system(size: 13)).foregroundStyle(KB.dim)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 4)
     }
 
     private var holidayStatus: String {
         let years = Holiday.coveredYears
-        let span = years.isEmpty ? "无数据" : "覆盖 \(years.first!)–\(years.last!)"
-        guard let d = Holiday.lastSync else { return "\(span) · 未联网更新" }
-        let f = DateFormatter()
-        f.dateFormat = "M月d日"
-        return "\(span) · 更新于 \(f.string(from: d))"
+        guard let a = years.first, let b = years.last else { return "无数据" }
+        return a == b ? "覆盖 \(a) 年" : "覆盖 \(a)–\(b) 年"
     }
 
     private func navLedger() -> some View {
