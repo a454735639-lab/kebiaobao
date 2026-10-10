@@ -199,10 +199,10 @@ struct ScheduleView: View {
 struct ManualEntryEditorView: View {
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) var dismiss
-    let onDone: () -> Void
-
     /// 预填：课程、操作类型、课时数、日期。任一为 nil 则用默认
-    var preset: (course: UUID?, op: Store.ManualOp, lessons: Int, date: Date)? = nil
+    var preset: (course: UUID?, op: Store.ManualOp, lessons: Int, date: Date)?
+
+    let onDone: () -> Void
 
     @State private var op: Store.ManualOp = .consume
     @State private var courseID: UUID?
