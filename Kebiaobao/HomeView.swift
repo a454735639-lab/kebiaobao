@@ -1,16 +1,19 @@
 import SwiftUI
 
 struct HomeView: View {
+
     @EnvironmentObject var store: Store
     @State private var sheet: HomeSheet?
 
-    enum HomeSheet: Identifiable {
+    enum HomeSheet: Identifiable, Hashable {
         case baby, addCourse, checkIn(LessonTemplate, Date), ledger
+        case manual(LessonTemplate, Date, Store.ManualOp)
         var id: String {
             switch self {
             case .baby: return "baby"
             case .addCourse: return "add"
             case .checkIn(let t, let d): return "ci-\(t.id)-\(d.timeIntervalSince1970)"
+            case .manual(let t, let d, let op): return "mn-\(t.id)-\(d.timeIntervalSince1970)-\(op)"
             case .ledger: return "ledger"
             }
         }
@@ -39,6 +42,14 @@ struct HomeView: View {
                 case .baby: BabyEditorView(baby: store.currentBaby)
                 case .addCourse: CourseEditorView(course: nil)
                 case .checkIn(let t, let d): CheckInSheet(template: t, date: d)
+                case .manual(let t, let d, let op):
+                    if s == .manual(t, d, op) {
+                        ManualEntryEditorView(preset: (t.courseID, op, t.deduct, d)) {
+                            sheet = nil
+                        }
+                    } else {
+                        EmptyView()
+                    }
                 case .ledger: LedgerListView(courseID: nil)
                 }
             }
@@ -184,10 +195,10 @@ struct HomeView: View {
             }
             HStack(spacing: 10) {
                 KBButton(title: "请假", filled: false, tint: KB.dim) {
-                    store.takeLeave(t, on: date)
+                    sheet = .manual(t, date, .leave)
                 }
-                KBButton(title: "扣 \(t.deduct) 课时", icon: "checkmark.circle.fill") {
-                    sheet = .checkIn(t, date)
+                KBButton(title: "扣课时", icon: "checkmark.circle.fill") {
+                    sheet = .manual(t, date, .consume)
                 }
             }
         }

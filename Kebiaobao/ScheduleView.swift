@@ -196,6 +196,240 @@ struct ScheduleView: View {
 }
 
 /// 打卡确认
+struct ManualEntryEditorView: View {
+    @EnvironmentObject var store: Store
+    @Environment(\.dismiss) var dismiss
+    let onDone: () -> Void
+
+    /// 预填：课程、操作类型、课时数、日期。任一为 nil 则用默认
+    var preset: (course: UUID?, op: Store.ManualOp, lessons: Int, date: Date)? = nil
+
+    @State private var op: Store.ManualOp = .consume
+    @State private var courseID: UUID?
+    @State private var lessonsText = "1"
+    @State private var date = Date()
+    @State private var price = ""
+    @State private var note = ""
+    @State private var showPicker = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                KB.bg.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 14) {
+                        Card {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("操作").font(.system(size: 15, weight: .semibold))
+                                HStack(spacing: 8) {
+                                    opChip(.consume, "扣课时", KB.warn)
+                                    opChip(.leave, "请假", KB.dim)
+                                    opChip(.charge, "加课时", KB.accent)
+                                }
+                            }
+                        }
+                        Card {
+                            Button { showPicker = true } label: {
+                                HStack {
+                                    Text("选择课程").font(.system(size: 15))
+                                        .foregroundStyle(courseID == nil ? KB.dim : KB.text)
+                                    Spacer()
+                                    if let id = courseID {
+                                        Text(store.course(id)?.name ?? "—")
+                                            .font(.system(size: 15, weight: .medium))
+                                    }
+                                    Image(systemName: "chevron.right").font(.system(size: 12))
+                                        .foregroundStyle(KB.dim)
+                                }
+                                .padding(.vertical, 11)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Card {
+                            HStack(alignment: .center) {
+                                Text("课时数").font(.system(size: 15))
+                                Spacer()
+                                HStack(spacing: 14) {
+                                    stepBtn("minus", -1)
+                                    TextField("1", text: $lessonsText)
+                                        .keyboardType(.numberPad)
+                                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                                        .multilineTextAlignment(.center)
+                                        .frame(width: 56)
+                                    stepBtn("plus", 1)
+                                }
+                            }
+                        }
+                        Card {
+                            HStack {
+                                Text("日期").font(.system(size: 15))
+                                Spacer()
+                                DatePicker("", selection: $date, displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                        if op == .charge {
+                            Card {
+                                HStack {
+                                    Text("单价").font(.system(size: 15))
+                                    Spacer()
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "yensign").foregroundStyle(KB.dim)
+                                        TextField("沿用原单价", text: $price)
+                                            .keyboardType(.decimalPad)
+                                            .font(.system(size: 15))
+                                            .multilineTextAlignment(.trailing)
+                                    }
+                                    .frame(width: 130)
+                                }
+                            }
+                        }
+                        Card {
+                            HStack(alignment: .top) {
+                                Text("备注").font(.system(size: 15))
+                                Spacer()
+                                TextField(Store.manualDefaultNote(op), text: $note)
+                                    .font(.system(size: 15))
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(maxWidth: 200)
+                            }
+                        }
+                        KBButton(title: "保存", icon: "checkmark") { save() }
+                            .disabled(courseID == nil)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 40)
+                }
+                if let id = courseID {
+                    Text("当前：\(store.course(id)?.name ?? "") · 剩余 \(store.remaining(store.course(id)!)) 课时")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
+                }
+            }
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Button { dismiss(); onDone() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(KB.dim)
+                            .frame(width: 32, height: 32)
+                    }
+                    Spacer()
+                    Text("手动记账").font(.system(size: 17, weight: .bold)).foregroundStyle(KB.text)
+                    Spacer()
+                    Color.clear.frame(width: 32, height: 32)
+                }
+                .padding(.horizontal, 12)
+                .background(Color.white.ignoresSafeArea())
+                .onAppear {
+                    if let p = preset {
+                        op = p.op; date = p.date; lessonsText = String(p.lessons)
+                        if p.course != nil { courseID = p.course }
+                        else { showPicker = true }
+                    } else if let b = store.currentBabyID, store.courses(for: b).isEmpty == false {
+                        showPicker = true
+                    }
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showPicker) { coursePicker }
+        }
+    }
+
+    private func stepBtn(_ icon: String, _ delta: Int) -> some View {
+        Button {
+            let n = max(1, (Int(lessonsText) ?? 1) + delta)
+            lessonsText = String(n)
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(KB.text)
+                .frame(width: 34, height: 34)
+                .background(KB.accentSoft)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func opChip(_ op2: Store.ManualOp, _ title: String, _ tint: Color) -> some View {
+        let sel = op == op2
+        return Button { op = op2 } label: {
+            Text(title)
+                .font(.system(size: 14, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .foregroundStyle(sel ? Color.white : KB.text)
+                .background(sel ? tint : Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(sel ? Color.clear : KB.line, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var coursePicker: some View {
+        NavigationStack {
+            ZStack {
+                KB.bg.ignoresSafeArea()
+                if store.courses(for: store.currentBabyID).isEmpty {
+                    Text("还没有课程\n请先在「课程管理」里新增").multilineTextAlignment(.center)
+                        .font(.system(size: 14)).foregroundStyle(KB.dim)
+                } else {
+                    List(store.courses(for: store.currentBabyID)) { c in
+                        Button {
+                            courseID = c.id
+                            if op == .charge {
+                                price = String(format: "%.2f", c.pricePerLesson)
+                            }
+                            showPicker = false
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(c.name).font(.system(size: 15, weight: .medium))
+                                    Text("\(store.remaining(c))/\(c.total) 节 · \(c.tag)")
+                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                }
+                                Spacer()
+                                if courseID == c.id {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(KB.accent)
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                }
+            }
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Spacer()
+                    Text("选择课程").font(.system(size: 17, weight: .bold)).foregroundStyle(KB.text)
+                    Spacer()
+                    Button("关闭") { showPicker = false }
+                        .font(.system(size: 15)).foregroundStyle(KB.dim)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.white.ignoresSafeArea())
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private func save() {
+        guard let id = courseID else { return }
+        store.recordManual(op, courseID: id,
+                           lessons: max(1, Int(lessonsText) ?? 1),
+                           date: date,
+                           note: note, price: Double(price.replacingOccurrences(of: ",", with: ".")) ?? 0)
+        dismiss(); onDone()
+    }
+}
+
 struct CheckInSheet: View {
     @EnvironmentObject var store: Store
     @Environment(\.dismiss) private var dismiss

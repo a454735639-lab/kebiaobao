@@ -23,16 +23,15 @@ struct MeView: View {
                         group("数据管理") {
                             row("person.crop.circle", "宝贝管理", "添加／编辑宝贝档案") { sheet = .baby }
                             row("book.closed", "课程管理", "新增课程、续费记录") { sheet = .addCourse }
+                            row("plus.circle.fill", "手动记账", "不限日期，直接加／扣课时") {
+                                showManual = true
+                            }
                             row("list.bullet.rectangle", "课时流水", "查看扣费／充值明细") { navLedger() }
                             row("chart.bar.xaxis", "数据分析", "消耗统计与支出估算") { navAnalytics() }
                         }
                         group("备份与恢复") {
                             row("square.and.arrow.up", "导出备份", "复制 JSON 保存") { exportBackup() }
                             row("square.and.arrow.down", "导入备份", "粘贴 JSON 覆盖") { showImport = true }
-                            row("arrow.counterclockwise", "载入示例数据", "覆盖当前全部数据") {
-                                store.resetToSample()
-                                toast = "已载入示例"
-                            }
                         }
                         group("关于") {
                             HStack {
@@ -64,6 +63,7 @@ struct MeView: View {
                 }
             }
             .sheet(isPresented: $showImport) { importSheet }
+            .sheet(isPresented: $showManual) { ManualEntryEditorView(onDone: { showManual = false }) }
             .alert("提示", isPresented: Binding(
                 get: { toast != nil },
                 set: { if !$0 { toast = nil } }

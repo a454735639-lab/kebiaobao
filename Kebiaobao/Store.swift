@@ -27,10 +27,7 @@ final class Store: ObservableObject {
 
     func load() {
         guard let data = try? Data(contentsOf: fileURL),
-              let s = try? JSONDecoder.kb.decode(Snapshot.self, from: data) else {
-            seed()
-            return
-        }
+              let s = try? JSONDecoder.kb.decode(Snapshot.self, from: data) else { return }
         babies = s.babies
         courses = s.courses
         templates = s.templates
@@ -43,37 +40,6 @@ final class Store: ObservableObject {
                          ledger: ledger, currentBabyID: currentBabyID)
         guard let data = try? JSONEncoder.kb.encode(s) else { return }
         try? data.write(to: fileURL, options: .atomic)
-    }
-
-    private func seed() {
-        let b = Baby(name: "宝贝", birthday: nil)
-        babies = [b]
-        currentBabyID = b.id
-        save()
-    }
-
-    func resetToSample() {
-        let b = Baby(name: "乐橙", birthday: KBDate.cal.date(from: DateComponents(year: 2019, month: 5, day: 20)))
-        let c1 = Course(babyID: b.id, name: "Kim", tag: "音乐", total: 144,
-                        pricePerLesson: 90,
-                        expiry: KBDate.cal.date(byAdding: .year, value: 1, to: Date())!)
-        let c2 = Course(babyID: b.id, name: "艾里", tag: "运动", total: 48,
-                        pricePerLesson: 120,
-                        expiry: KBDate.cal.date(byAdding: .month, value: 8, to: Date())!)
-        babies = [b]
-        courses = [c1, c2]
-        templates = [
-            LessonTemplate(courseID: c1.id, weekdays: [2, 4], hour: 16, minute: 40,
-                           place: "少年宫3楼", teacher: "王老师", deduct: 1, remindMinutes: 30),
-            LessonTemplate(courseID: c2.id, weekdays: [6], hour: 11, minute: 0,
-                           place: "游泳馆", teacher: "李教练", deduct: 1, remindMinutes: 60)
-        ]
-        ledger = [
-            LedgerEntry(courseID: c1.id, date: Date(), delta: -1, kind: .consume, note: "正常上课"),
-            LedgerEntry(courseID: c1.id, date: Date(), delta: -1, kind: .consume, note: "正常上课")
-        ]
-        currentBabyID = b.id
-        save()
     }
 
     // MARK: - 查询
@@ -168,6 +134,38 @@ final class Store: ObservableObject {
         ledger.append(LedgerEntry(courseID: courseID, date: Date(),
                                   delta: lessons, kind: .charge, note: note))
         save()
+    }
+
+    /// 手动记账：扣课时 / 请假 / 加课时。独立于排课，可自选日期与课时数。
+    enum ManualOp: Hashable { case consume, leave, charge }
+
+    func recordManual(_ op: ManualOp, courseID: UUID, lessons: Int, date: Date,
+                      note: String, price: Double) {
+        let n = max(1, lessons)
+        let memo = note.isEmpty ? Self.manualDefaultNote(op) : note
+        switch op {
+        case .consume:
+            ledger.append(LedgerEntry(courseID: courseID, date: date, delta: -n,
+                                      kind: .consume, note: memo))
+        case .leave:
+            ledger.append(LedgerEntry(courseID: courseID, date: date, delta: 0,
+                                      kind: .leave, note: memo))
+        case .charge:
+            guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+            courses[i].total += n
+            if price > 0 { courses[i].pricePerLesson = price }
+            ledger.append(LedgerEntry(courseID: courseID, date: date, delta: n,
+                                      kind: .charge, note: memo))
+        }
+        save()
+    }
+
+    private static func manualDefaultNote(_ op: ManualOp) -> String {
+        switch op {
+        case .consume: return "手动扣课时"
+        case .leave:   return "请假（不扣课时）"
+        case .charge:  return "补录课时"
+        }
     }
 
     /// 撤销一条流水（反向记账）
