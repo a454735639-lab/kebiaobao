@@ -10,12 +10,23 @@ final class Store: ObservableObject {
     /// true = 显示全部宝贝的数据（currentBabyID 被忽略）
     @Published var allBabies = false
 
-    private var fileURL: URL {
-        let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return d.appendingPathComponent("kebiaobao.json")
+    private var dir: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    private struct Snapshot: Codable {
+    private var fileURL: URL { dir.appendingPathComponent("kebiaobao.json") }
+
+    /// 最近一次覆盖式导入前的自动快照
+    private var backupURL: URL { dir.appendingPathComponent("kebiaobao.backup.json") }
+
+    var hasBackup: Bool { FileManager.default.fileExists(atPath: backupURL.path) }
+
+    var backupDate: Date? {
+        (try? backupURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate
+    }
+
+    struct Snapshot: Codable {
         var babies: [Baby]
         var courses: [Course]
         var templates: [LessonTemplate]
@@ -38,10 +49,45 @@ final class Store: ObservableObject {
     }
 
     func save() {
-        let s = Snapshot(babies: babies, courses: courses, templates: templates,
-                         ledger: ledger, currentBabyID: currentBabyID)
+        write(snapshot(), to: fileURL)
+    }
+
+    private func snapshot() -> Snapshot {
+        Snapshot(babies: babies, courses: courses, templates: templates,
+                 ledger: ledger, currentBabyID: currentBabyID)
+    }
+
+    private func write(_ s: Snapshot, to url: URL) {
         guard let data = try? JSONEncoder.kb.encode(s) else { return }
-        try? data.write(to: fileURL, options: .atomic)
+        try? data.write(to: url, options: .atomic)
+    }
+
+    /// 覆盖前快照：把当前数据另存一份，供「恢复上次导入」使用
+    func backupNow() {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        try? FileManager.default.removeItem(at: backupURL)
+        try? FileManager.default.copyItem(at: fileURL, to: backupURL)
+    }
+
+    /// 恢复上一次导入前的数据
+    func restoreBackup() throws {
+        guard FileManager.default.fileExists(atPath: backupURL.path) else {
+            throw NSError(domain: "kb", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey: "没有可恢复的备份"])
+        }
+        let data = try Data(contentsOf: backupURL)
+        let s = try JSONDecoder.kb.decode(Snapshot.self, from: data)
+        apply(s)
+    }
+
+    private func apply(_ s: Snapshot) {
+        babies = s.babies
+        courses = s.courses
+        templates = s.templates
+        ledger = s.ledger
+        currentBabyID = s.currentBabyID ?? s.babies.first?.id
+        if allBabies && babies.count <= 1 { allBabies = false }
+        save()
     }
 
     // MARK: - 查询
@@ -69,6 +115,13 @@ final class Store: ObservableObject {
               .reduce(0) { $0 + abs($1.delta) }
     }
 
+    /// 已花费金额：优先用记账当时的单价，旧数据回退课程当前单价
+    func spent(_ courseID: UUID) -> Double {
+        let c = course(courseID)
+        return ledger.filter { $0.courseID == courseID && $0.delta < 0 }
+            .reduce(0) { $0 + Double(abs($1.delta)) * ($1.unitPrice ?? c?.pricePerLesson ?? 0) }
+    }
+
     func remaining(_ course: Course) -> Int { course.total - consumed(course.id) }
 
     func entries(_ courseID: UUID) -> [LedgerEntry] {
@@ -84,11 +137,6 @@ final class Store: ObservableObject {
             cal.isDate(e.date, equalTo: now, toGranularity: .month) &&
             (babyID == nil || course(e.courseID)?.babyID == babyID)
         }.reduce(0) { $0 + abs($1.delta) }
-    }
-
-    func spent(_ courseID: UUID) -> Double {
-        guard let c = course(courseID) else { return 0 }
-        return Double(consumed(courseID)) * c.pricePerLesson
     }
 
     func remainingValue(_ courseID: UUID) -> Double {
@@ -120,11 +168,24 @@ final class Store: ObservableObject {
 
     // MARK: - 变更
 
-    func checkIn(_ template: LessonTemplate, on date: Date) {
-        let e = LedgerEntry(courseID: template.courseID, date: date,
-                            delta: -abs(template.deduct), kind: .consume, note: "正常上课")
-        ledger.append(e)
+    /// 打卡结果
+    enum CheckInResult { case ok, duplicate }
+
+    /// 打卡。同一天同一排课已有扣课记录时返回 .duplicate，不重复记账。
+    @discardableResult
+    func checkIn(_ template: LessonTemplate, on date: Date) -> CheckInResult {
+        let day = KBDate.day(date)
+        let dup = ledger.contains {
+            $0.courseID == template.courseID && $0.kind == .consume &&
+            KBDate.isSameDay($0.date, day)
+        }
+        if dup { return .duplicate }
+        ledger.append(LedgerEntry(courseID: template.courseID, date: date,
+                                  delta: -abs(template.deduct), kind: .consume,
+                                  note: "正常上课",
+                                  unitPrice: course(template.courseID)?.pricePerLesson))
         save()
+        return .ok
     }
 
     func takeLeave(_ template: LessonTemplate, on date: Date) {
@@ -136,10 +197,12 @@ final class Store: ObservableObject {
 
     func charge(_ courseID: UUID, lessons: Int, price: Double, note: String) {
         guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+        let unit = price > 0 ? price : courses[i].pricePerLesson
         courses[i].total += lessons
         if price > 0 { courses[i].pricePerLesson = price }
         ledger.append(LedgerEntry(courseID: courseID, date: Date(),
-                                  delta: lessons, kind: .charge, note: note))
+                                  delta: lessons, kind: .charge, note: note,
+                                  unitPrice: unit))
         save()
     }
 
@@ -153,17 +216,45 @@ final class Store: ObservableObject {
         switch op {
         case .consume:
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: -n,
-                                      kind: .consume, note: memo))
+                                      kind: .consume, note: memo,
+                                      unitPrice: course(courseID)?.pricePerLesson))
         case .leave:
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: 0,
                                       kind: .leave, note: memo))
         case .charge:
             guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+            let unit = price > 0 ? price : courses[i].pricePerLesson
             courses[i].total += n
             if price > 0 { courses[i].pricePerLesson = price }
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: n,
-                                      kind: .charge, note: memo))
+                                      kind: .charge, note: memo, unitPrice: unit))
         }
+        save()
+    }
+
+    /// 补填最后一条流水的备注与课后小结（打卡弹窗用）
+    func updateLastEntry(note: String?, summary: String?) {
+        guard let i = ledger.indices.last else { return }
+        if let note, !note.isEmpty, note != "正常上课" { ledger[i].note = note }
+        if let summary {
+            let s = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            ledger[i].summary = s.isEmpty ? nil : s
+        }
+        save()
+    }
+
+    /// 结课归档：保留流水与排课，仅从首页／课表隐藏
+    func setArchived(_ courseID: UUID, _ archived: Bool) {
+        guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+        courses[i].archived = archived
+        save()
+    }
+
+    /// 已归档课程（不进 scope 过滤）
+    func archivedCourses() -> [Course] { courses.filter(\.archived) }
+
+    func deleteTemplate(_ id: UUID) {
+        templates.removeAll { $0.id == id }
         save()
     }
 
@@ -201,6 +292,7 @@ final class Store: ObservableObject {
     }
 
     func deleteCourse(_ id: UUID) {
+        backupNow()
         courses.removeAll { $0.id == id }
         templates.removeAll { $0.courseID == id }
         ledger.removeAll { $0.courseID == id }
@@ -247,12 +339,14 @@ final class Store: ObservableObject {
         }
 
         var entryRows: [[String]] = [["流水ID", "课程ID", "课程", "日期", "类型",
-                                      "课时", "备注", "课后小结"]]
+                                      "课时", "单价", "备注", "课后小结"]]
         for e in ledger.filter({ ids.contains($0.courseID) }).sorted(by: { $0.date < $1.date }) {
             entryRows.append([e.id.uuidString, e.courseID.uuidString,
                               course(e.courseID)?.name ?? "",
                               KBDate.mdhm.string(from: e.date), e.kind.label,
-                              "\(e.delta)", e.note, e.summary ?? ""])
+                              "\(e.delta)",
+                              String(format: "%g", e.unitPrice ?? course(e.courseID)?.pricePerLesson ?? 0),
+                              e.note, e.summary ?? ""])
         }
 
         let name = cs.count == 1 ? cs[0].name : "全部课程"
@@ -293,8 +387,21 @@ final class Store: ObservableObject {
         }
     }
 
-    /// 覆盖式导入：按表头名识别列，ID 列用于还原关联
-    func importXLSX(_ data: Data) throws {
+    /// 导入预览：解析后统计条数，供用户确认后再落库
+    struct ImportPreview: Identifiable {
+        let id = UUID()
+        let snapshot: Snapshot
+        let babyCount: Int
+        let courseCount: Int
+        let templateCount: Int
+        let ledgerCount: Int
+        var summary: String {
+            "宝贝 \(babyCount) · 课程 \(courseCount) · 排课 \(templateCount) · 流水 \(ledgerCount)"
+        }
+    }
+
+    /// 只解析不落库；覆盖式导入：按表头名识别列，ID 列用于还原关联
+    func parseXLSX(_ data: Data) throws -> ImportPreview {
         let sheets = XLSX.parse(data)
         guard !sheets.isEmpty else {
             throw NSError(domain: "kb", code: 2,
@@ -309,15 +416,20 @@ final class Store: ObservableObject {
             if let d = r["生日"], !d.isEmpty { b.birthday = KBDate.ymd.date(from: d) }
             newBabies.append(b)
         }
+        let babyIDs = Set(newBabies.map(\.id))
 
         // 课程表可能是「课程」「全部课程」或课程名，按表头识别
         var newCourses: [Course] = []
         for r in table(sheets, "课程", requiring: ["课程", "总课时"]) {
             let name = (r["课程"] ?? "").trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else { continue }
-            let babyID = UUID(uuidString: r["宝贝ID"] ?? "") ?? newBabies.first?.id ?? UUID()
+            // 宝贝ID 必须能在宝贝表里找到，否则课程会挂到不可见的孤儿宝贝上
+            guard let bid = UUID(uuidString: r["宝贝ID"] ?? ""), babyIDs.contains(bid) else {
+                throw NSError(domain: "kb", code: 5, userInfo: [NSLocalizedDescriptionKey:
+                    "课程「\(name)」的宝贝ID 在「宝贝」表里找不到，导入会丢数据。请检查导出文件是否完整。"])
+            }
             let c = Course(id: UUID(uuidString: r["ID"] ?? "") ?? UUID(),
-                           babyID: babyID, name: name,
+                           babyID: bid, name: name,
                            tag: r["标签"] ?? "",
                            total: Int(r["总课时"] ?? "") ?? 0,
                            pricePerLesson: Double(r["单价"] ?? "") ?? 0,
@@ -367,7 +479,7 @@ final class Store: ObservableObject {
         let kinds: [String: RecordKind] = Dictionary(uniqueKeysWithValues:
             RecordKind.allCases.map { ($0.label, $0) })
         var newLedger: [LedgerEntry] = []
-        for r in table(sheets, "流水", requiring: ["流水ID", "课后小结"]) {
+        for r in table(sheets, "流水", requiring: ["流水ID", "课程ID"]) {
             guard let cid = UUID(uuidString: r["课程ID"] ?? ""), courseIDs.contains(cid) else { continue }
             let date = KBDate.mdhm.date(from: r["日期"] ?? "")
                 ?? KBDate.ymd.date(from: r["日期"] ?? "") ?? Date()
@@ -378,7 +490,8 @@ final class Store: ObservableObject {
                 delta: Int(r["课时"] ?? "") ?? 0,
                 kind: kinds[r["类型"] ?? ""] ?? .consume,
                 note: r["备注"] ?? "",
-                summary: sum.isEmpty ? nil : sum))
+                summary: sum.isEmpty ? nil : sum,
+                unitPrice: Double(r["单价"] ?? "")))
         }
 
         guard !newCourses.isEmpty || !newBabies.isEmpty else {
@@ -386,22 +499,17 @@ final class Store: ObservableObject {
                           userInfo: [NSLocalizedDescriptionKey: "表格里没有可导入的数据"])
         }
 
-        babies = newBabies
-        courses = newCourses
-        templates = newTemplates
-        ledger = newLedger
-        currentBabyID = newBabies.first?.id
-        save()
+        return ImportPreview(
+            snapshot: Snapshot(babies: newBabies, courses: newCourses,
+                               templates: newTemplates, ledger: newLedger,
+                               currentBabyID: newBabies.first?.id),
+            babyCount: newBabies.count, courseCount: newCourses.count,
+            templateCount: newTemplates.count, ledgerCount: newLedger.count)
     }
 
-    func importJSON(_ text: String) throws {
-        guard let data = text.data(using: .utf8) else { throw NSError(domain: "kb", code: 1) }
-        let s = try JSONDecoder.kb.decode(Snapshot.self, from: data)
-        babies = s.babies
-        courses = s.courses
-        templates = s.templates
-        ledger = s.ledger
-        currentBabyID = s.currentBabyID ?? s.babies.first?.id
-        save()
+    /// 应用一份已解析的导入结果（用户确认后调用）
+    func commitImport(_ p: ImportPreview) {
+        backupNow()
+        apply(p.snapshot)
     }
 }

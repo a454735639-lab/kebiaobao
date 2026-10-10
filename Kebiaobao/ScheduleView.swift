@@ -567,6 +567,7 @@ struct CheckInSheet: View {
     @State private var deduct: Int = 1
     @State private var note = "正常上课"
     @State private var summary = ""
+    @State private var duplicate = false
 
     var body: some View {
         NavigationStack {
@@ -614,13 +615,11 @@ struct CheckInSheet: View {
                     KBButton(title: "确认扣课 \(deduct) 课时", icon: "checkmark.circle.fill") {
                         var t = template
                         t.deduct = deduct
-                        store.checkIn(t, on: date)
-                        if let i = store.ledger.indices.last {
-                            if !note.isEmpty, note != "正常上课" { store.ledger[i].note = note }
-                            let s = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-                            store.ledger[i].summary = s.isEmpty ? nil : s
-                            store.save()
+                        guard store.checkIn(t, on: date) == .ok else {
+                            duplicate = true
+                            return
                         }
+                        store.updateLastEntry(note: note, summary: summary)
                         dismiss()
                     }
                     Spacer()
@@ -633,6 +632,11 @@ struct CheckInSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
                 }
+            }
+            .alert("今天已经打过卡", isPresented: $duplicate) {
+                Button("好") { dismiss() }
+            } message: {
+                Text("这门课今天已有扣课记录。如需调整，请到课时流水里撤销或改备注。")
             }
         }
         .onAppear { deduct = max(1, template.deduct) }

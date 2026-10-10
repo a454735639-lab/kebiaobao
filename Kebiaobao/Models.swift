@@ -99,6 +99,8 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var note: String
     /// 课后小结（可选，旧数据解码为 nil）
     var summary: String? = nil
+    /// 记账当时的单价（旧数据为 nil，回退到课程当前单价）
+    var unitPrice: Double? = nil
 }
 
 extension JSONEncoder {

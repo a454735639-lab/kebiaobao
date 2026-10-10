@@ -6,6 +6,9 @@ struct CourseManageView: View {
     @EnvironmentObject var store: Store
     @State private var editing: Course?
     @State private var adding = false
+    @State private var showArchived = false
+
+    private var archived: [Course] { store.archivedCourses() }
 
     var body: some View {
         ZStack {
@@ -17,11 +20,45 @@ struct CourseManageView: View {
                             .font(.system(size: 13)).foregroundStyle(KB.dim)
                             .padding(.vertical, 24)
                     }
-                    ForEach(store.courses) { c in
+                    ForEach(store.courses.filter { !$0.archived }) { c in
                         Button { editing = c } label: { row(c) }
                             .buttonStyle(.plain)
                     }
                     KBButton(title: "新增课程", icon: "plus") { adding = true }
+
+                    if !archived.isEmpty {
+                        HStack {
+                            Text("已结课（\(archived.count)）")
+                                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                            Spacer()
+                            Button(showArchived ? "收起" : "展开") { showArchived.toggle() }
+                                .font(.system(size: 12)).foregroundStyle(KB.accent)
+                                .buttonStyle(.plain)
+                        }
+                        .padding(.top, 8)
+                        if showArchived {
+                            ForEach(archived) { c in
+                                Card {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(c.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(KB.dim)
+                                            Text("已上 \(store.consumed(c.id))/\(c.total) 节 · 流水保留")
+                                                .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                        }
+                                        Spacer()
+                                        Button {
+                                            store.setArchived(c.id, false)
+                                        } label: {
+                                            Text("恢复").font(.system(size: 12)).foregroundStyle(KB.accent)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Color.clear.frame(height: 20)
                 }
                 .padding(16)

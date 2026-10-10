@@ -11,6 +11,12 @@ struct MeView: View {
     @State private var showPicker = false
     @State private var shareItem: ShareItem?
     @State private var toast: String?
+    @State private var pending: Store.ImportPreview?
+    @State private var confirmRestore = false
+
+    private var backupSub: String {
+        store.backupDate.map { "覆盖前自动快照 · \(KBDate.mdhm.string(from: $0))" } ?? "覆盖前自动快照"
+    }
 
     var body: some View {
         NavigationStack {
@@ -39,7 +45,11 @@ struct MeView: View {
                             row("square.and.arrow.up", "导出 Excel",
                                 "全部宝贝／课程／排课／流水 (.xlsx)") { exportAll() }
                             row("doc.badge.plus", "导入 Excel",
-                                "选择 .xlsx 文件，覆盖当前数据") { showImport = true }
+                                "选择 .xlsx 文件，确认后覆盖当前数据") { showImport = true }
+                            if store.hasBackup {
+                                row("arrow.uturn.backward", "恢复上次导入前的数据",
+                                    backupSub) { confirmRestore = true }
+                            }
                         }
                         group("关于") {
                             HStack {
@@ -65,6 +75,7 @@ struct MeView: View {
                 .background(KB.bg)
             }
             .sheet(isPresented: $showImport) { importSheet }
+            .sheet(item: $pending) { p in importConfirmSheet(p) }
             .sheet(item: $shareItem) { item in
                 ShareSheet(url: item.url)
             }
@@ -85,6 +96,16 @@ struct MeView: View {
             )) {
                 Button("好") { toast = nil }
             } message: { Text(toast ?? "") }
+            .confirmationDialog("恢复上次导入前的数据？", isPresented: $confirmRestore,
+                                titleVisibility: .visible) {
+                Button("恢复", role: .destructive) {
+                    do { try store.restoreBackup(); toast = "已恢复" }
+                    catch { toast = "恢复失败：\(error.localizedDescription)" }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("当前数据会被备份内容覆盖。")
+            }
         }
     }
 
@@ -268,11 +289,47 @@ struct MeView: View {
             let url = try result.get()
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            try store.importXLSX(Data(contentsOf: url))
+            let p = try store.parseXLSX(Data(contentsOf: url))
             showImport = false
-            toast = "导入成功"
+            // 等导入 sheet 完全消失再弹确认页，避免同帧切换 sheet 丢失
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { pending = p }
         } catch {
             toast = "导入失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// 导入确认：先展示解析结果，确认后才覆盖
+    private func importConfirmSheet(_ p: Store.ImportPreview) -> some View {
+        NavigationStack {
+            ZStack {
+                KB.bg.ignoresSafeArea()
+                VStack(spacing: 14) {
+                    Card {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("即将导入").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                            Text(p.summary).font(.system(size: 14)).foregroundStyle(KB.text)
+                            Text("当前数据：宝贝 \(store.babies.count) · 课程 \(store.courses.count) · 流水 \(store.ledger.count)")
+                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                            Text("覆盖前会自动备份当前数据，可在「我的 → 备份与恢复」里恢复。")
+                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        }
+                    }
+                    KBButton(title: "确认覆盖导入", icon: "exclamationmark.triangle.fill") {
+                        store.commitImport(p)
+                        pending = nil
+                        toast = "导入成功"
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .navigationTitle("确认导入")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { pending = nil }
+                }
+            }
         }
     }
 

@@ -32,6 +32,10 @@ struct KebiaobaoApp: App {
                 .environmentObject(store)
                 .tint(KB.accent)
                 .preferredColorScheme(KBAppearance(rawValue: appearance)?.scheme)
+                .task {
+                    KBReminder.requestAuth()
+                    KBReminder.sync(templates: store.templates, courses: store.courses)
+                }
         }
     }
 }
@@ -58,6 +62,13 @@ struct RootView: View {
         .onAppear { applyTabBar() }
         // scheme 变化时重建 tab bar 外观
         .onChange(of: scheme) { _, _ in applyTabBar() }
+        // 排课／课程变动后重建提醒
+        .onChange(of: store.templates) { _, _ in resyncReminders() }
+        .onChange(of: store.courses) { _, _ in resyncReminders() }
+    }
+
+    private func resyncReminders() {
+        KBReminder.sync(templates: store.templates, courses: store.courses)
     }
 
     private func applyTabBar() {

@@ -10,6 +10,7 @@ struct CourseDetailView: View {
     @State private var edit = false
     @State private var addTemplate = false
     @State private var editingTemplate: LessonTemplate?
+    @State private var deletingTemplate: LessonTemplate?
     @State private var confirmDelete = false
     @State private var renew = false
     @State private var shareItem: MeView.ShareItem?
@@ -27,6 +28,9 @@ struct CourseDetailView: View {
                     ledgerCard
                     KBButton(title: "导出本课程 Excel", icon: "square.and.arrow.up",
                              filled: false) { exportCourse() }
+                    KBButton(title: current.archived ? "恢复课程" : "结课归档",
+                             icon: "archivebox",
+                             filled: false) { store.setArchived(current.id, !current.archived) }
                     KBButton(title: "删除课程", filled: false, tint: KB.danger) {
                         confirmDelete = true
                     }
@@ -49,6 +53,20 @@ struct CourseDetailView: View {
         }
         .sheet(isPresented: $renew) { RenewSheet(course: current) }
         .sheet(item: $shareItem) { item in ShareSheet(url: item.url) }
+        .alert("删除这条排课？", isPresented: Binding(
+            get: { deletingTemplate != nil },
+            set: { if !$0 { deletingTemplate = nil } }
+        )) {
+            Button("取消", role: .cancel) { deletingTemplate = nil }
+            Button("删除", role: .destructive) {
+                if let t = deletingTemplate {
+                    store.deleteTemplate(t.id)
+                }
+                deletingTemplate = nil
+            }
+        } message: {
+            Text("已记过的流水不受影响。")
+        }
         .alert("删除课程？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
@@ -56,7 +74,7 @@ struct CourseDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("将同时删除该课程的排课与全部课时流水，不可恢复。")
+            Text("将同时删除该课程的排课与全部课时流水，不可恢复。删除前会自动备份，可在「我的 → 备份与恢复」里还原。")
         }
     }
 
@@ -154,8 +172,7 @@ struct CourseDetailView: View {
                             }
                             .buttonStyle(.plain)
                             Button {
-                                store.templates.removeAll { $0.id == t.id }
-                                store.save()
+                                deletingTemplate = t
                             } label: {
                                 Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(KB.danger)
                             }
@@ -381,11 +398,22 @@ struct LedgerListView: View {
     @EnvironmentObject var store: Store
     let courseID: UUID?
     @State private var filter: UUID?
+    @State private var kind: RecordKind?
+    @State private var query = ""
 
     private var items: [LedgerEntry] {
-        let all = store.ledger
+        var all = store.ledger
             .filter { courseID == nil || $0.courseID == courseID }
             .filter { filter == nil || $0.courseID == filter }
+            .filter { kind == nil || $0.kind == kind }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty {
+            all = all.filter { e in
+                e.note.localizedCaseInsensitiveContains(q)
+                    || (e.summary ?? "").localizedCaseInsensitiveContains(q)
+                    || (store.course(e.courseID)?.name.localizedCaseInsensitiveContains(q) ?? false)
+            }
+        }
         return all.sorted { $0.date > $1.date }
     }
 
@@ -409,6 +437,38 @@ struct LedgerListView: View {
                     }
                     .padding(.top, 8)
                 }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        chip("全部类型", active: kind == nil) { kind = nil }
+                        ForEach(RecordKind.allCases, id: \.self) { k in
+                            chip(k.label, active: kind == k) { kind = k }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                    TextField("搜备注／小结／课程", text: $query)
+                        .font(.system(size: 14))
+                        .textFieldStyle(.plain)
+                        .autocorrectionDisabled()
+                    if !query.isEmpty {
+                        Button {
+                            query = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14)).foregroundStyle(KB.dim)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, 9)
+                .background(KB.card)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(KB.line, lineWidth: 1))
+                .padding(.horizontal, 16)
                 if items.isEmpty {
                     Spacer()
                     Text("暂无流水").font(.system(size: 14)).foregroundStyle(KB.dim)
