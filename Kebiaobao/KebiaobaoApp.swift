@@ -58,6 +58,16 @@ struct RootView: View {
         .onAppear { applyTabBar() }
         // scheme 变化时重建 tab bar 外观
         .onChange(of: scheme) { _, _ in applyTabBar() }
+        // 节假日数据：启动后台刷新（7 天节流），成功后触发整树重绘
+        .task {
+            if Holiday.needsRefresh(), await Holiday.refreshRemote() {
+                NotificationCenter.default.post(name: .kbHolidaysUpdated, object: nil)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kbHolidaysUpdated)) { _ in
+            holidayTick &+= 1
+        }
+        .id(holidayTick)
     }
 
     private func applyTabBar() {
