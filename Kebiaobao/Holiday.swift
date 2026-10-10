@@ -22,7 +22,7 @@ enum Holiday {
         return d
     }()
 
-    /// 数据覆盖的年份范围（用于提示「该年数据未收录」）
+    /// 数据覆盖的年份范围（保留：日历年份选择器可用）
     static var coveredYears: [Int] {
         Set(table.keys.compactMap { Int($0.prefix(4)) }).sorted()
     }

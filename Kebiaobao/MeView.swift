@@ -37,8 +37,7 @@ struct MeView: View {
                                 showManual = true
                             }
                             navLedger()
-                            navAnalytics()
-                            holidayRow                        }
+                            navAnalytics()                        }
                         group("外观") {
                             row("moon.stars", "深色模式",
                                 KBAppearance(rawValue: appearance)?.title ?? "跟随系统") {
@@ -177,28 +176,6 @@ struct MeView: View {
             .padding(.horizontal, 16).padding(.vertical, 13)
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    /// 节假日数据状态行（纯本地，无联网）
-    private var holidayRow: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "calendar.badge.checkmark")
-                .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("节假日数据").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                Text(holidayStatus).font(.system(size: 11)).foregroundStyle(KB.dim)
-            }
-            Spacer()
-            Text("内置").font(.system(size: 13)).foregroundStyle(KB.dim)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var holidayStatus: String {
-        let years = Holiday.coveredYears
-        guard let a = years.first, let b = years.last else { return "无数据" }
-        return a == b ? "覆盖 \(a) 年" : "覆盖 \(a)–\(b) 年"
     }
 
     private func navLedger() -> some View {
