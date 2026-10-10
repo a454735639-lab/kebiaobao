@@ -5,6 +5,9 @@ options:
     iOS: "17.0"
   createIntermediateGroups: true
   groupSortPosition: top
+  # runner 为 Xcode 15.4，必须写旧格式（77 = Xcode 16，打不开）
+  objectVersion: 56
+  xcodeVersion: "15.0"
 
 settings:
   base:

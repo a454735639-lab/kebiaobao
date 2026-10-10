@@ -23,7 +23,13 @@ jobs:
         run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          # 兜底：强制旧格式，避免 runner 的 Xcode 版本低于生成器
+          PBX=Kebiaobao.xcodeproj/project.pbxproj
+          grep -m1 objectVersion "$PBX" || true
+          sed -i '' -E 's/objectVersion = [0-9]+;/objectVersion = 56;/' "$PBX"
+          grep -m1 objectVersion "$PBX"
 
       - name: Build (no code signing)
         run: |
