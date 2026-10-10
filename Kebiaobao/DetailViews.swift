@@ -9,6 +9,7 @@ struct CourseDetailView: View {
 
     @State private var edit = false
     @State private var addTemplate = false
+    @State private var editingTemplate: LessonTemplate?
     @State private var confirmDelete = false
     @State private var renew = false
     @State private var shareItem: MeView.ShareItem?
@@ -43,6 +44,9 @@ struct CourseDetailView: View {
         }
         .sheet(isPresented: $edit) { CourseEditorView(course: current) }
         .sheet(isPresented: $addTemplate) { TemplateEditorView(template: nil, courseID: current.id) }
+        .sheet(item: $editingTemplate) { t in
+            TemplateEditorView(template: t, courseID: current.id)
+        }
         .sheet(isPresented: $renew) { RenewSheet(course: current) }
         .sheet(item: $shareItem) { item in ShareSheet(url: item.url) }
         .alert("删除课程？", isPresented: $confirmDelete) {
@@ -141,6 +145,12 @@ struct CourseDetailView: View {
                             Text("每次划扣 \(t.deduct) 课时")
                                 .font(.system(size: 11)).foregroundStyle(KB.dim)
                             Spacer()
+                            Button {
+                                editingTemplate = t
+                            } label: {
+                                Image(systemName: "pencil").font(.system(size: 12)).foregroundStyle(KB.accent)
+                            }
+                            .buttonStyle(.plain)
                             Button {
                                 store.templates.removeAll { $0.id == t.id }
                                 store.save()
@@ -242,6 +252,12 @@ struct LedgerRow: View {
     @State private var draft = ""
     @State private var editingSummary = false
     @State private var sumDraft = ""
+    @State private var viewing: LedgerEntry?
+
+    private func editSummary(_ s: String) {
+        sumDraft = s
+        editingSummary = true
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -265,17 +281,29 @@ struct LedgerRow: View {
                     draft = entry.note
                     editing = true
                 }
-                if let s = entry.summary, !s.isEmpty {
-                    Text("小结：\(s)")
-                        .font(.system(size: 11)).foregroundStyle(KB.text.opacity(0.75))
-                        .lineLimit(3)
-                        .contentShape(Rectangle())
-                        .onTapGesture { sumDraft = s; editingSummary = true }
-                } else {
-                    Text("加课后小结")
-                        .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
-                        .contentShape(Rectangle())
-                        .onTapGesture { sumDraft = ""; editingSummary = true }
+                if entry.kind == .consume {
+                    HStack(spacing: 6) {
+                        if let s = entry.summary, !s.isEmpty {
+                            Text("小结：\(s)")
+                                .font(.system(size: 11)).foregroundStyle(KB.text.opacity(0.75))
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .onTapGesture { viewing = entry }
+                            Button { editSummary(s) } label: {
+                                Image(systemName: "square.and.pencil")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(KB.accent)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text("加课后小结")
+                                .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .onTapGesture { editSummary("") }
+                        }
+                    }
                 }
             }
             Spacer()
@@ -309,6 +337,40 @@ struct LedgerRow: View {
             Button("保存") { store.updateSummary(entry, summary: sumDraft) }
         } message: {
             Text("\(store.course(entry.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: entry.date))")
+        }
+        .sheet(item: $viewing) { e in
+            NavigationStack {
+                ZStack {
+                    KB.bg.ignoresSafeArea()
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("\(store.course(e.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: e.date))")
+                                .font(.system(size: 13)).foregroundStyle(KB.dim)
+                            Text(e.summary ?? "")
+                                .font(.system(size: 15)).foregroundStyle(KB.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Color.clear.frame(height: 20)
+                        }
+                        .padding(16)
+                    }
+                }
+                .navigationTitle("课后小结")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭") { viewing = nil }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("编辑") {
+                            let s = e.summary ?? ""
+                            viewing = nil
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                editSummary(s)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
