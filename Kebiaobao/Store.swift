@@ -188,6 +188,14 @@ final class Store: ObservableObject {
         save()
     }
 
+    /// 修改某条流水的课后小结
+    func updateSummary(_ entry: LedgerEntry, summary: String) {
+        guard let i = ledger.firstIndex(where: { $0.id == entry.id }) else { return }
+        let s = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        ledger[i].summary = s.isEmpty ? nil : s
+        save()
+    }
+
     func deleteCourse(_ id: UUID) {
         courses.removeAll { $0.id == id }
         templates.removeAll { $0.courseID == id }
@@ -195,14 +203,189 @@ final class Store: ObservableObject {
         save()
     }
 
-    // MARK: - 导入导出
+    // MARK: - Excel 导出 / 导入
 
-    func exportJSON() -> String {
-        let s = Snapshot(babies: babies, courses: courses, templates: templates,
-                         ledger: ledger, currentBabyID: currentBabyID)
-        guard let data = try? JSONEncoder.kb.encode(s),
-              let str = String(data: data, encoding: .utf8) else { return "{}" }
-        return str
+    /// 单课程导出：只含该课程及其排课、流水、所属宝贝
+    func exportXLSX(courseID: UUID? = nil) -> Data {
+        let cs: [Course]
+        if let courseID { cs = courses.filter { $0.id == courseID } } else { cs = courses }
+        let ids = Set(cs.map(\.id))
+        let bs = babies.filter { b in courseID == nil || cs.contains { $0.babyID == b.id } }
+
+        var babyRows: [[String]] = [["ID", "姓名", "生日"]]
+        for b in bs {
+            babyRows.append([b.id.uuidString, b.name,
+                             b.birthday.map { KBDate.ymd.string(from: $0) } ?? ""])
+        }
+
+        var courseRows: [[String]] = [["ID", "宝贝ID", "宝贝", "课程", "标签",
+                                       "总课时", "已用", "剩余", "单价", "总价", "到期日"]]
+        for c in cs {
+            let used = consumed(c.id)
+            courseRows.append([c.id.uuidString, c.babyID.uuidString,
+                               baby(c.babyID)?.name ?? "", c.name, c.tag,
+                               "\(c.total)", "\(used)", "\(c.total - used)",
+                               String(format: "%g", c.pricePerLesson),
+                               String(format: "%.2f", c.totalFee),
+                               KBDate.ymd.string(from: c.expiry)])
+        }
+
+        var slotRows: [[String]] = [["排课ID", "课程ID", "课程", "星期", "时间",
+                                     "老师", "地点", "每次划扣", "提前提醒(分)"]]
+        for t in templates where ids.contains(t.courseID) {
+            for s in t.orderedSlots {
+                slotRows.append([t.id.uuidString, t.courseID.uuidString,
+                                 course(t.courseID)?.name ?? "",
+                                 s.dayName, s.timeText, s.teacher, s.place,
+                                 "\(t.deduct)", "\(t.remindMinutes)"])
+            }
+        }
+
+        var entryRows: [[String]] = [["流水ID", "课程ID", "课程", "日期", "类型",
+                                      "课时", "备注", "课后小结"]]
+        for e in ledger.filter({ ids.contains($0.courseID) }).sorted(by: { $0.date < $1.date }) {
+            entryRows.append([e.id.uuidString, e.courseID.uuidString,
+                              course(e.courseID)?.name ?? "",
+                              KBDate.mdhm.string(from: e.date), e.kind.label,
+                              "\(e.delta)", e.note, e.summary ?? ""])
+        }
+
+        let name = cs.count == 1 ? cs[0].name : "全部课程"
+        return XLSX.build([
+            XLSX.Sheet(name: "宝贝", rows: babyRows),
+            XLSX.Sheet(name: Self.safeSheet(name), rows: courseRows),
+            XLSX.Sheet(name: "排课", rows: slotRows),
+            XLSX.Sheet(name: "流水", rows: entryRows),
+        ])
+    }
+
+    /// Excel 表名限制：≤31 字符，且不含 []:*?/\
+    static func safeSheet(_ s: String) -> String {
+        let bad: [Character: String] = ["[": "（", "]": "）", ":": "：",
+                                        "*": "＊", "?": "？", "/": "／", "\\": "＼"]
+        var t = String(s.map { bad[$0] ?? String($0) }.joined()
+                        .prefix(31))
+        t = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "课程" : t
+    }
+
+    /// 按表头名识别列；找不到同名表时退回「含指定表头」的第一张表
+    private func table(_ sheets: [XLSX.Sheet], _ name: String,
+                       requiring headers: [String] = []) -> [[String: String]] {
+        let s = sheets.first { $0.name == name }
+            ?? sheets.first { sh in
+                guard !headers.isEmpty, let h = sh.rows.first else { return false }
+                return headers.allSatisfy { h.contains($0) }
+            }
+        guard let s, let head = s.rows.first else { return [] }
+        return s.rows.dropFirst().compactMap { r in
+            guard r.contains(where: { !$0.isEmpty }) else { return nil }
+            var d: [String: String] = [:]
+            for (i, h) in head.enumerated() where !h.isEmpty {
+                d[h] = i < r.count ? r[i] : ""
+            }
+            return d
+        }
+    }
+
+    /// 覆盖式导入：按表头名识别列，ID 列用于还原关联
+    func importXLSX(_ data: Data) throws {
+        let sheets = XLSX.parse(data)
+        guard !sheets.isEmpty else {
+            throw NSError(domain: "kb", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "无法识别 Excel 文件"])
+        }
+
+        var newBabies: [Baby] = []
+        for r in table(sheets, "宝贝") {
+            let name = (r["姓名"] ?? "").trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { continue }
+            var b = Baby(id: UUID(uuidString: r["ID"] ?? "") ?? UUID(), name: name, birthday: nil)
+            if let d = r["生日"], !d.isEmpty { b.birthday = KBDate.ymd.date(from: d) }
+            newBabies.append(b)
+        }
+
+        // 课程表可能是「课程」「全部课程」或课程名，按表头识别
+        var newCourses: [Course] = []
+        for r in table(sheets, "课程", requiring: ["课程", "总课时"]) {
+            let name = (r["课程"] ?? "").trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { continue }
+            let babyID = UUID(uuidString: r["宝贝ID"] ?? "") ?? newBabies.first?.id ?? UUID()
+            let c = Course(id: UUID(uuidString: r["ID"] ?? "") ?? UUID(),
+                           babyID: babyID, name: name,
+                           tag: r["标签"] ?? "",
+                           total: Int(r["总课时"] ?? "") ?? 0,
+                           pricePerLesson: Double(r["单价"] ?? "") ?? 0,
+                           expiry: KBDate.ymd.date(from: r["到期日"] ?? "") ?? Date())
+            newCourses.append(c)
+        }
+        let courseIDs = Set(newCourses.map(\.id))
+
+        // 排课：按排课ID 聚合，同一模板的多个星期合成一条
+        var newTemplates: [LessonTemplate] = []
+        let slotRows = table(sheets, "排课", requiring: ["排课ID", "星期"]).filter {
+            courseIDs.contains(UUID(uuidString: $0["课程ID"] ?? "") ?? UUID())
+        }
+        var grouped: [UUID: [String: String]] = [:]
+        var order: [UUID] = []
+        for r in slotRows {
+            guard let tid = UUID(uuidString: r["排课ID"] ?? "") else { continue }
+            if grouped[tid] == nil { grouped[tid] = r; order.append(tid) }
+        }
+        for tid in order {
+            guard let r = grouped[tid] else { continue }
+            let days = slotRows.filter { $0["排课ID"] == r["排课ID"] }
+            let weeks = days.compactMap { d -> Int? in
+                guard let n = KBDate.weekdayCN.firstIndex(of: d["星期"] ?? "") else { return nil }
+                return n == 0 ? nil : n
+            }
+            guard !weeks.isEmpty, let cid = UUID(uuidString: r["课程ID"] ?? "") else { continue }
+            let slots = days.compactMap { d -> DaySlot? in
+                guard let n = KBDate.weekdayCN.firstIndex(of: d["星期"] ?? ""), n != 0 else { return nil }
+                let hm = (d["时间"] ?? "").split(separator: ":")
+                return DaySlot(weekday: n,
+                               hour: hm.count == 2 ? (Int(hm[0]) ?? 0) : 0,
+                               minute: hm.count == 2 ? (Int(hm[1]) ?? 0) : 0,
+                               teacher: d["老师"] ?? "", place: d["地点"] ?? "")
+            }
+            let first = slots.first
+            newTemplates.append(LessonTemplate(
+                id: tid, courseID: cid, weekdays: weeks.sorted(),
+                hour: first?.hour ?? 0, minute: first?.minute ?? 0,
+                place: first?.place ?? "", teacher: first?.teacher ?? "",
+                deduct: Int(r["每次划扣"] ?? "") ?? 1,
+                remindMinutes: Int(r["提前提醒(分)"] ?? "") ?? 0,
+                slots: slots))
+        }
+
+        let kinds: [String: RecordKind] = Dictionary(uniqueKeysWithValues:
+            RecordKind.allCases.map { ($0.label, $0) })
+        var newLedger: [LedgerEntry] = []
+        for r in table(sheets, "流水", requiring: ["流水ID", "课后小结"]) {
+            guard let cid = UUID(uuidString: r["课程ID"] ?? ""), courseIDs.contains(cid) else { continue }
+            let date = KBDate.mdhm.date(from: r["日期"] ?? "")
+                ?? KBDate.ymd.date(from: r["日期"] ?? "") ?? Date()
+            let sum = (r["课后小结"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            newLedger.append(LedgerEntry(
+                id: UUID(uuidString: r["流水ID"] ?? "") ?? UUID(),
+                courseID: cid, date: date,
+                delta: Int(r["课时"] ?? "") ?? 0,
+                kind: kinds[r["类型"] ?? ""] ?? .consume,
+                note: r["备注"] ?? "",
+                summary: sum.isEmpty ? nil : sum))
+        }
+
+        guard !newCourses.isEmpty || !newBabies.isEmpty else {
+            throw NSError(domain: "kb", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "表格里没有可导入的数据"])
+        }
+
+        babies = newBabies
+        courses = newCourses
+        templates = newTemplates
+        ledger = newLedger
+        currentBabyID = newBabies.first?.id
+        save()
     }
 
     func importJSON(_ text: String) throws {

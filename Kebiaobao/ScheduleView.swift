@@ -5,6 +5,18 @@ struct ScheduleView: View {
     @State private var month = Date()
     @State private var selected = KBDate.day(Date())
     @State private var addSheet = false
+    @State private var sheet: SchedSheet?
+
+    enum SchedSheet: Identifiable {
+        case checkIn(LessonTemplate)
+        case manual(LessonTemplate, Store.ManualOp)
+        var id: String {
+            switch self {
+            case .checkIn(let t): return "ci-\(t.id)"
+            case .manual(let t, let op): return "mn-\(t.id)-\(op)"
+            }
+        }
+    }
 
     private let cal = KBDate.cal
 
@@ -41,6 +53,14 @@ struct ScheduleView: View {
             }
             .sheet(isPresented: $addSheet) {
                 TemplateEditorView(template: nil, courseID: store.courses(for: store.currentBabyID).first?.id)
+            }
+            .sheet(item: $sheet) { s in
+                switch s {
+                case .checkIn(let t): CheckInSheet(template: t, date: selected)
+                case .manual(let t, let op):
+                    ManualEntryEditorView(preset: (t.courseID, op, t.deduct, selected),
+                                          onDone: { sheet = nil })
+                }
             }
         }
     }
@@ -189,16 +209,24 @@ struct ScheduleView: View {
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             Spacer()
-            Button {
-                store.checkIn(t, on: selected)
-            } label: {
-                Text("扣课")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(KB.onAccent)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(KB.accent).clipShape(Capsule())
+            HStack(spacing: 6) {
+                Button { sheet = .manual(t, .consume) } label: {
+                    Text("调课")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(KB.accent)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(KB.accentSoft).clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                Button { sheet = .checkIn(t) } label: {
+                    Text("扣课")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(KB.onAccent)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(KB.accent).clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(10)
         .background(KB.bg)
@@ -449,6 +477,7 @@ struct CheckInSheet: View {
 
     @State private var deduct: Int = 1
     @State private var note = "正常上课"
+    @State private var summary = ""
 
     var body: some View {
         NavigationStack {
@@ -481,13 +510,26 @@ struct CheckInSheet: View {
                             FieldRow(label: "备注", text: $note, placeholder: "正常上课")
                         }
                     }
+                    Card {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("课后小结").font(.system(size: 15)).foregroundStyle(KB.text)
+                            TextField("本节学了什么、表现如何", text: $summary, axis: .vertical)
+                                .font(.system(size: 14))
+                                .lineLimit(3...6)
+                                .textFieldStyle(.plain)
+                                .padding(10)
+                                .background(KB.bg)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                    }
                     KBButton(title: "确认扣课 \(deduct) 课时", icon: "checkmark.circle.fill") {
                         var t = template
                         t.deduct = deduct
                         store.checkIn(t, on: date)
-                        if !note.isEmpty, note != "正常上课",
-                           let i = store.ledger.indices.last {
-                            store.ledger[i].note = note
+                        if let i = store.ledger.indices.last {
+                            if !note.isEmpty, note != "正常上课" { store.ledger[i].note = note }
+                            let s = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+                            store.ledger[i].summary = s.isEmpty ? nil : s
                             store.save()
                         }
                         dismiss()

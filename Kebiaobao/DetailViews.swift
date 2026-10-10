@@ -11,6 +11,7 @@ struct CourseDetailView: View {
     @State private var addTemplate = false
     @State private var confirmDelete = false
     @State private var renew = false
+    @State private var shareItem: MeView.ShareItem?
 
     private var current: Course { store.course(course.id) ?? course }
 
@@ -23,6 +24,8 @@ struct CourseDetailView: View {
                     infoCard
                     templateCard
                     ledgerCard
+                    KBButton(title: "导出本课程 Excel", icon: "square.and.arrow.up",
+                             filled: false) { exportCourse() }
                     KBButton(title: "删除课程", filled: false, tint: KB.danger) {
                         confirmDelete = true
                     }
@@ -41,6 +44,7 @@ struct CourseDetailView: View {
         .sheet(isPresented: $edit) { CourseEditorView(course: current) }
         .sheet(isPresented: $addTemplate) { TemplateEditorView(template: nil, courseID: current.id) }
         .sheet(isPresented: $renew) { RenewSheet(course: current) }
+        .sheet(item: $shareItem) { item in ShareSheet(url: item.url) }
         .alert("删除课程？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
@@ -93,6 +97,12 @@ struct CourseDetailView: View {
                 row("总费用", "¥\(String(format: "%.2f", current.totalFee))")
             }
             .padding(.horizontal, 16)
+        }
+    }
+
+    private func exportCourse() {
+        if let url = MeView.writeFile(store.exportXLSX(courseID: current.id), name: current.name) {
+            shareItem = MeView.ShareItem(url: url)
         }
     }
 
@@ -230,6 +240,8 @@ struct LedgerRow: View {
 
     @State private var editing = false
     @State private var draft = ""
+    @State private var editingSummary = false
+    @State private var sumDraft = ""
 
     var body: some View {
         HStack(spacing: 12) {
@@ -248,11 +260,23 @@ struct LedgerRow: View {
                             .lineLimit(1)
                     }
                 }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                draft = entry.note
-                editing = true
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    draft = entry.note
+                    editing = true
+                }
+                if let s = entry.summary, !s.isEmpty {
+                    Text("小结：\(s)")
+                        .font(.system(size: 11)).foregroundStyle(KB.text.opacity(0.75))
+                        .lineLimit(3)
+                        .contentShape(Rectangle())
+                        .onTapGesture { sumDraft = s; editingSummary = true }
+                } else {
+                    Text("加课后小结")
+                        .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
+                        .contentShape(Rectangle())
+                        .onTapGesture { sumDraft = ""; editingSummary = true }
+                }
             }
             Spacer()
             if entry.kind != .leave {
@@ -276,6 +300,13 @@ struct LedgerRow: View {
             TextField("如：调课到周六", text: $draft)
             Button("取消", role: .cancel) {}
             Button("保存") { store.updateNote(entry, note: draft) }
+        } message: {
+            Text("\(store.course(entry.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: entry.date))")
+        }
+        .alert("课后小结", isPresented: $editingSummary) {
+            TextField("本节学了什么、表现如何", text: $sumDraft, axis: .vertical)
+            Button("取消", role: .cancel) {}
+            Button("保存") { store.updateSummary(entry, summary: sumDraft) }
         } message: {
             Text("\(store.course(entry.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: entry.date))")
         }

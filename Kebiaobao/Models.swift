@@ -94,6 +94,8 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var delta: Int               // 正=充值，负=扣课
     var kind: RecordKind
     var note: String
+    /// 课后小结（可选，旧数据解码为 nil）
+    var summary: String? = nil
 }
 
 extension JSONEncoder {

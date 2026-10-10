@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct MeView: View {
     @EnvironmentObject var store: Store
@@ -7,7 +9,8 @@ struct MeView: View {
     @State private var showAppearance = false
     @AppStorage("kb.appearance") private var appearance = KBAppearance.system.rawValue
     @State private var showManual = false
-    @State private var importText = ""
+    @State private var showPicker = false
+    @State private var shareItem: ShareItem?
     @State private var toast: String?
 
     enum MeSheet: Identifiable {
@@ -45,8 +48,10 @@ struct MeView: View {
                             }
                         }
                         group("备份与恢复") {
-                            row("square.and.arrow.up", "导出备份", "复制 JSON 保存") { exportBackup() }
-                            row("square.and.arrow.down", "导入备份", "粘贴 JSON 覆盖") { showImport = true }
+                            row("square.and.arrow.up", "导出 Excel",
+                                "全部宝贝／课程／排课／流水 (.xlsx)") { exportAll() }
+                            row("doc.badge.plus", "导入 Excel",
+                                "选择 .xlsx 文件，覆盖当前数据") { showImport = true }
                         }
                         group("关于") {
                             HStack {
@@ -79,6 +84,9 @@ struct MeView: View {
                 }
             }
             .sheet(isPresented: $showImport) { importSheet }
+            .sheet(item: $shareItem) { item in
+                ShareSheet(url: item.url)
+            }
             .sheet(isPresented: $showManual) {
                 ManualEntryEditorView(preset: nil, onDone: { showManual = false })
             }
@@ -224,30 +232,19 @@ struct MeView: View {
             ZStack {
                 KB.bg.ignoresSafeArea()
                 VStack(spacing: 14) {
-                    Text("粘贴之前导出的 JSON，导入后覆盖当前全部数据")
+                    Text("选择导出的 .xlsx 文件，导入后覆盖当前全部数据")
                         .font(.system(size: 13)).foregroundStyle(KB.dim)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    TextEditor(text: $importText)
-                        .font(.system(size: 12, design: .monospaced))
-                        .scrollContentBackground(.hidden)
-                        .background(KB.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(KB.line))
-                    KBButton(title: "导入并覆盖") {
-                        do {
-                            try store.importJSON(importText)
-                            showImport = false
-                            importText = ""
-                            toast = "导入成功"
-                        } catch {
-                            toast = "导入失败：\(error.localizedDescription)"
-                        }
-                    }
+                    KBButton(title: "选择 Excel 文件", icon: "folder") { showPicker = true }
                 }
                 .padding(16)
             }
-            .navigationTitle("导入备份")
+            .navigationTitle("导入 Excel")
             .navigationBarTitleDisplayMode(.inline)
+            .fileImporter(isPresented: $showPicker,
+                          allowedContentTypes: [.init(filenameExtension: "xlsx") ?? .data]) { result in
+                handleImport(result)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { showImport = false }
@@ -256,8 +253,49 @@ struct MeView: View {
         }
     }
 
-    private func exportBackup() {
-        UIPasteboard.general.string = store.exportJSON()
-        toast = "备份 JSON 已复制到剪贴板"
+    private func handleImport(_ result: Result<URL, Error>) {
+        do {
+            let url = try result.get()
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            try store.importXLSX(Data(contentsOf: url))
+            showImport = false
+            toast = "导入成功"
+        } catch {
+            toast = "导入失败：\(error.localizedDescription)"
+        }
     }
+
+    private func exportAll() { share(store.exportXLSX(), name: "课时宝-全部") }
+
+    /// 导出单个课程（课程详情页复用）
+    static func writeFile(_ data: Data, name: String) -> URL? {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("\(name).xlsx")
+        do { try data.write(to: url, options: .atomic) } catch { return nil }
+        return url
+    }
+
+    private func share(_ data: Data, name: String) {
+        guard let url = Self.writeFile(data, name: name) else {
+            toast = "导出失败：无法写入文件"; return
+        }
+        shareItem = ShareItem(url: url)
+    }
+
+    struct ShareItem: Identifiable {
+        let id = UUID()
+        let url: URL
+    }
+}
+
+/// 系统分享面板（用于导出文件）
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ v: UIActivityViewController, context: Context) {}
 }
