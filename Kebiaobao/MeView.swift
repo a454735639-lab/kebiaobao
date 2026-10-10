@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 struct MeView: View {
     @EnvironmentObject var store: Store
@@ -16,6 +17,38 @@ struct MeView: View {
 
     private var backupSub: String {
         store.backupDate.map { "覆盖前自动快照 · \(KBDate.mdhm.string(from: $0))" } ?? "覆盖前自动快照"
+    }
+
+    @State private var notifyStatus: UNAuthorizationStatus = .notDetermined
+
+    private var reminderSub: String {
+        switch notifyStatus {
+        case .authorized, .provisional:
+            let n = store.templates.filter { $0.remindMinutes > 0 }.count
+            return n > 0 ? "已开启 · \(n) 条排课提前提醒" : "已开启（排课里设置提前分钟数后生效）"
+        case .denied: return "已关闭 · 点这里去系统设置开启"
+        default: return "点这里授权，按排课时间提醒"
+        }
+    }
+
+    private func handleReminderTap() {
+        switch notifyStatus {
+        case .denied:
+            if let u = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(u)
+            }
+        default:
+            KBReminder.requestAuth {
+                KBReminder.sync(templates: store.templates, courses: store.courses)
+                refreshNotifyStatus()
+            }
+        }
+    }
+
+    private func refreshNotifyStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { s in
+            DispatchQueue.main.async { notifyStatus = s.authorizationStatus }
+        }
     }
 
     var body: some View {
@@ -34,6 +67,10 @@ struct MeView: View {
                             }
                             navLedger()
                             navAnalytics()
+                        }
+                        group("提醒") {
+                            row("bell.badge", "排课提醒",
+                                reminderSub) { handleReminderTap() }
                         }
                         group("外观") {
                             row("moon.stars", "深色模式",
@@ -75,6 +112,7 @@ struct MeView: View {
                 .background(KB.bg)
             }
             .sheet(isPresented: $showImport) { importSheet }
+            .onAppear { refreshNotifyStatus() }
             .sheet(item: $pending) { p in importConfirmSheet(p) }
             .sheet(item: $shareItem) { item in
                 ShareSheet(url: item.url)

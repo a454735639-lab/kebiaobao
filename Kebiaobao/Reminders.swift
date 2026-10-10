@@ -5,10 +5,12 @@ import UserNotifications
 enum KBReminder {
     private static let prefix = "kb.lesson."
 
-    /// 请求权限（首次会弹系统框）
-    static func requestAuth() {
+    /// 请求权限（首次会弹系统框）；授权结果回来后回调
+    static func requestAuth(then done: (() -> Void)? = nil) {
         UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+            .requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in
+                DispatchQueue.main.async { done?() }
+            }
     }
 
     /// 按当前排课重建全部提醒。无权限时静默失败。

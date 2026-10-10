@@ -33,8 +33,10 @@ struct KebiaobaoApp: App {
                 .tint(KB.accent)
                 .preferredColorScheme(KBAppearance(rawValue: appearance)?.scheme)
                 .task {
-                    KBReminder.requestAuth()
-                    KBReminder.sync(templates: store.templates, courses: store.courses)
+                    // 授权结果回来后再建提醒，否则首启时 status 还是 notDetermined
+                    KBReminder.requestAuth {
+                        KBReminder.sync(templates: store.templates, courses: store.courses)
+                    }
                 }
         }
     }
