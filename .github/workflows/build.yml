@@ -1,0 +1,73 @@
+name: Build unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build (no code signing)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Kebiaobao.xcodeproj \
+            -scheme Kebiaobao \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
+            build 2>&1 | tee build.log | tail -60
+
+      - name: Package unsigned IPA
+        run: |
+          APP=$(find build/Build/Products -name 'Kebiaobao.app' -maxdepth 3 -type d | head -1)
+          echo "APP=$APP"
+          test -n "$APP" || { echo "::error::Kebiaobao.app not found"; exit 1; }
+          rm -rf Payload Kebiaobao-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Payload/Kebiaobao.app/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Payload/Kebiaobao.app/Info.plist
+          zip -qry Kebiaobao-unsigned.ipa Payload
+          ls -lh Kebiaobao-unsigned.ipa
+          shasum -a 256 Kebiaobao-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kebiaobao-unsigned-ipa
+          path: Kebiaobao-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
