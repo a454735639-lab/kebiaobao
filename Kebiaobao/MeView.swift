@@ -123,13 +123,13 @@ struct MeView: View {
     }
 
     private var statCard: some View {
-        let list = store.courses(for: store.currentBabyID)
+        let list = store.courses(for: store.scope)
         let remain = list.reduce(0) { $0 + store.remaining($1) }
         return Card {
             HStack(spacing: 0) {
                 StatTile(value: "\(list.count)", label: "总课程")
                 Divider().frame(height: 34)
-                StatTile(value: "\(store.monthConsumed(store.currentBabyID))", label: "本月课时")
+                StatTile(value: "\(store.monthConsumed(store.scope))", label: "本月课时")
                 Divider().frame(height: 34)
                 StatTile(value: "\(remain)", label: "剩余课时")
             }

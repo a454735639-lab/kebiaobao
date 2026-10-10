@@ -60,11 +60,18 @@ struct HomeView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Menu {
+                Button {
+                    store.allBabies = true; store.save()
+                } label: {
+                    Label("全部宝贝", systemImage: store.allBabies ? "checkmark" : "square.grid.2x2")
+                }
+                Divider()
                 ForEach(store.babies) { b in
                     Button {
+                        store.allBabies = false
                         store.currentBabyID = b.id; store.save()
                     } label: {
-                        Label(b.name, systemImage: b.id == store.currentBabyID ? "checkmark" : "person")
+                        Label(b.name, systemImage: (!store.allBabies && b.id == store.currentBabyID) ? "checkmark" : "person")
                     }
                 }
                 Divider()
@@ -75,15 +82,23 @@ struct HomeView: View {
                 HStack(spacing: 8) {
                     ZStack {
                         Circle().fill(KB.accentSoft).frame(width: 38, height: 38)
-                        Text(String(store.currentBaby?.name.prefix(1) ?? "宝"))
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(KB.accent)
+                        if store.allBabies {
+                            Image(systemName: "square.grid.2x2.fill")
+                                .font(.system(size: 16)).foregroundStyle(KB.accent)
+                        } else {
+                            Text(String(store.currentBaby?.name.prefix(1) ?? "宝"))
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(KB.accent)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(store.currentBaby?.name ?? "宝贝")
+                        Text(store.allBabies ? "全部宝贝" : (store.currentBaby?.name ?? "宝贝"))
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(KB.text)
-                        if let bd = store.currentBaby?.birthday {
+                        if store.allBabies {
+                            Text("\(store.babies.count) 个宝贝 · \(store.courses(for: nil).count) 门课程")
+                                .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        } else if let bd = store.currentBaby?.birthday {
                             Text("生日 \(KBDate.cnFull.string(from: bd))")
                                 .font(.system(size: 11)).foregroundStyle(KB.dim)
                         }
@@ -110,8 +125,7 @@ struct HomeView: View {
     // MARK: - 统计
 
     private var statCard: some View {
-        let babyID = store.currentBabyID
-        let list = store.courses(for: babyID)
+        let list = store.courses(for: store.scope)
         let remain = list.reduce(0) { $0 + store.remaining($1) }
         return Card {
             HStack(spacing: 0) {
@@ -128,7 +142,7 @@ struct HomeView: View {
     // MARK: - 近 3 天课程
 
     private var upcomingCard: some View {
-        let days = store.upcomingDays(days: 3, babyID: store.currentBabyID)
+        let days = store.upcomingDays(days: 3, babyID: store.scope)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -158,7 +172,7 @@ struct HomeView: View {
         let today = KBDate.day(Date())
         let label: String = KBDate.isSameDay(date, today) ? "今天"
             : (KBDate.isSameDay(date, KBDate.cal.date(byAdding: .day, value: 1, to: today)!) ? "明天" : "后天")
-        let items = store.lessons(on: date, babyID: store.currentBabyID)
+        let items = store.lessons(on: date, babyID: store.scope)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text(label)
@@ -220,7 +234,7 @@ struct HomeView: View {
     // MARK: - 今日 / 在读课程
 
     private var todayCard: some View {
-        let list = store.courses(for: store.currentBabyID)
+        let list = store.courses(for: store.scope)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {

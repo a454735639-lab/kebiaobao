@@ -390,7 +390,7 @@ struct LedgerListView: View {
     }
 
     private var filterCourses: [Course] {
-        store.courses(for: store.currentBabyID)
+        store.courses(for: store.scope)
     }
 
     var body: some View {
@@ -453,7 +453,7 @@ struct LedgerListView: View {
 struct AnalyticsView: View {
     @EnvironmentObject var store: Store
 
-    private var list: [Course] { store.courses(for: store.currentBabyID) }
+    private var list: [Course] { store.courses(for: store.scope) }
 
     private var totalSpent: Double {
         list.reduce(0) { $0 + store.spent($1.id) }

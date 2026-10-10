@@ -93,7 +93,7 @@ struct BabyManageView: View {
     }
 
     private func row(_ b: Baby) -> some View {
-        let current = b.id == store.currentBabyID
+        let current = !store.allBabies && b.id == store.currentBabyID
         let n = store.courses(for: b.id).count
         return Card {
             HStack(spacing: 12) {

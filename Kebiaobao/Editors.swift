@@ -98,6 +98,7 @@ struct CourseEditorView: View {
     @State private var price = ""
     @State private var expiry = Calendar.current.date(byAdding: .year, value: 1, to: Date())!
     @State private var purchased = Date()
+    @State private var babyID: UUID?
     @State private var advance = false
     @State private var advanceLessons = ""
     @State private var advancePrice = ""
@@ -118,6 +119,21 @@ struct CourseEditorView: View {
                                 Divider()
                                 FieldRow(label: "类别标签", text: $tag, placeholder: "如：音乐、运动、美术")
                                 Divider()
+                                if store.babies.count > 1 {
+                                    HStack {
+                                        Text("所属宝贝").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Spacer()
+                                        Picker("", selection: $babyID) {
+                                            ForEach(store.babies) { b in
+                                                Text(b.name).tag(Optional(b.id))
+                                            }
+                                        }
+                                        .labelsHidden()
+                                        .tint(KB.accent)
+                                    }
+                                    .padding(.vertical, 6)
+                                    Divider()
+                                }
                                 FieldRow(label: "总课时*", text: $total, placeholder: "12", keyboard: .numberPad)
                                 Divider()
                                 FieldRow(label: "单价（元/节）*", text: $price, placeholder: "90", keyboard: .decimalPad)
@@ -179,6 +195,7 @@ struct CourseEditorView: View {
                     price = String(format: "%g", c.pricePerLesson)
                     expiry = c.expiry
                     purchased = c.boughtAt
+                    babyID = c.babyID
                 }
             }
         }
@@ -189,7 +206,9 @@ struct CourseEditorView: View {
         guard !n.isEmpty, let t = Int(total), t > 0 else { return }
         let p = Double(price) ?? 0
         let babyID: UUID
-        if let id = store.currentBabyID {
+        if let chosen = self.babyID {
+            babyID = chosen
+        } else if let id = store.currentBabyID {
             babyID = id
         } else {
             let b = Baby(name: "宝贝", birthday: nil)

@@ -69,7 +69,7 @@ struct ScheduleView: View {
                 .background(KB.bg)
             }
             .sheet(isPresented: $addSheet) {
-                TemplateEditorView(template: nil, courseID: store.courses(for: store.currentBabyID).first?.id)
+                TemplateEditorView(template: nil, courseID: store.courses(for: store.scope).first?.id)
             }
             .sheet(item: $sheet) { s in
                 switch s {
@@ -125,7 +125,7 @@ struct ScheduleView: View {
     }
 
     private func weekSection(_ d: Date) -> some View {
-        let items = store.lessons(on: d, babyID: store.currentBabyID)
+        let items = store.lessons(on: d, babyID: store.scope)
         let isToday = KBDate.isSameDay(d, Date())
         let wd = cal.component(.weekday, from: d)
         let df = DateFormatter()
@@ -244,7 +244,7 @@ struct ScheduleView: View {
     @ViewBuilder
     private func dayCell(_ d: Date?) -> some View {
         if let d {
-            let items = store.lessons(on: d, babyID: store.currentBabyID)
+            let items = store.lessons(on: d, babyID: store.scope)
             let isSel = KBDate.isSameDay(d, selected)
             let isToday = KBDate.isSameDay(d, Date())
             let wd = cal.component(.weekday, from: d)
@@ -455,7 +455,7 @@ struct ManualEntryEditorView: View {
                         op = p.op; date = p.date; lessonsText = String(p.lessons)
                         if p.course != nil { courseID = p.course }
                         else { showPicker = true }
-                    } else if let b = store.currentBabyID, store.courses(for: b).isEmpty == false {
+                    } else if let b = store.scope, store.courses(for: b).isEmpty == false {
                         showPicker = true
                     }
                 }
@@ -502,11 +502,11 @@ struct ManualEntryEditorView: View {
         NavigationStack {
             ZStack {
                 KB.bg.ignoresSafeArea()
-                if store.courses(for: store.currentBabyID).isEmpty {
+                if store.courses(for: store.scope).isEmpty {
                     Text("还没有课程\n请先在「课程管理」里新增").multilineTextAlignment(.center)
                         .font(.system(size: 14)).foregroundStyle(KB.dim)
                 } else {
-                    List(store.courses(for: store.currentBabyID)) { c in
+                    List(store.courses(for: store.scope)) { c in
                         Button {
                             courseID = c.id
                             if op == .charge {

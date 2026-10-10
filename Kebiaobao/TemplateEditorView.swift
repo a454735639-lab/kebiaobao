@@ -18,7 +18,7 @@ struct TemplateEditorView: View {
     @State private var deduct = 1
     @State private var remind = 30
 
-    private var list: [Course] { store.courses(for: store.currentBabyID) }
+    private var list: [Course] { store.courses(for: store.scope) }
 
     /// 每个选中星期，各自的安排
     private var orderedSlots: [DaySlot] {

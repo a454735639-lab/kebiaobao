@@ -7,6 +7,8 @@ final class Store: ObservableObject {
     @Published var templates: [LessonTemplate] = []
     @Published var ledger: [LedgerEntry] = []
     @Published var currentBabyID: UUID?
+    /// true = 显示全部宝贝的数据（currentBabyID 被忽略）
+    @Published var allBabies = false
 
     private var fileURL: URL {
         let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -51,9 +53,11 @@ final class Store: ObservableObject {
     func course(_ id: UUID) -> Course? { courses.first { $0.id == id } }
 
     func courses(for babyID: UUID?) -> [Course] {
-        guard let babyID else { return [] }
-        return courses.filter { $0.babyID == babyID && !$0.archived }
+        courses.filter { (babyID == nil || $0.babyID == babyID) && !$0.archived }
     }
+
+    /// 当前筛选范围：开启「全部宝贝」时为 nil（= 全部）
+    var scope: UUID? { allBabies ? nil : currentBabyID }
 
     func templates(for courseID: UUID) -> [LessonTemplate] {
         templates.filter { $0.courseID == courseID }
