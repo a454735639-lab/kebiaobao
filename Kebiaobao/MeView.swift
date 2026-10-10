@@ -4,6 +4,8 @@ struct MeView: View {
     @EnvironmentObject var store: Store
     @State private var sheet: MeSheet?
     @State private var showImport = false
+    @State private var showAppearance = false
+    @AppStorage("kb.appearance") private var appearance = KBAppearance.system.rawValue
     @State private var showManual = false
     @State private var importText = ""
     @State private var toast: String?
@@ -30,6 +32,12 @@ struct MeView: View {
                             navLedger()
                             navAnalytics()
                         }
+                        group("外观") {
+                            row("moon.stars", "深色模式",
+                                KBAppearance(rawValue: appearance)?.title ?? "跟随系统") {
+                                showAppearance = true
+                            }
+                        }
                         group("备份与恢复") {
                             row("square.and.arrow.up", "导出备份", "复制 JSON 保存") { exportBackup() }
                             row("square.and.arrow.down", "导入备份", "粘贴 JSON 覆盖") { showImport = true }
@@ -38,7 +46,7 @@ struct MeView: View {
                             HStack {
                                 Text("版本").font(.system(size: 14)).foregroundStyle(KB.dim)
                                 Spacer()
-                                Text("1.0.0").font(.system(size: 14)).foregroundStyle(KB.text)
+                                Text(appVersion).font(.system(size: 14)).foregroundStyle(KB.text)
                             }
                             .padding(.vertical, 4)
                         }
@@ -67,6 +75,14 @@ struct MeView: View {
             .sheet(isPresented: $showManual) {
                 ManualEntryEditorView(preset: nil, onDone: { showManual = false })
             }
+            .confirmationDialog("深色模式", isPresented: $showAppearance, titleVisibility: .visible) {
+                ForEach(KBAppearance.allCases) { a in
+                    Button(a.title) { appearance = a.rawValue }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("当前：\(KBAppearance(rawValue: appearance)?.title ?? "跟随系统")")
+            }
             .alert("提示", isPresented: Binding(
                 get: { toast != nil },
                 set: { if !$0 { toast = nil } }
@@ -74,6 +90,12 @@ struct MeView: View {
                 Button("好") { toast = nil }
             } message: { Text(toast ?? "") }
         }
+    }
+
+    private var appVersion: String {
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(v) (\(b))"
     }
 
     private var profileCard: some View {

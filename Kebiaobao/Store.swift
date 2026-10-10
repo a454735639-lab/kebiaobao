@@ -181,6 +181,13 @@ final class Store: ObservableObject {
         save()
     }
 
+    /// 修改某条流水的备注
+    func updateNote(_ entry: LedgerEntry, note: String) {
+        guard let i = ledger.firstIndex(where: { $0.id == entry.id }) else { return }
+        ledger[i].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        save()
+    }
+
     func deleteCourse(_ id: UUID) {
         courses.removeAll { $0.id == id }
         templates.removeAll { $0.courseID == id }

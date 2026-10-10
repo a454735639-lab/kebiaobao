@@ -2,15 +2,31 @@ import SwiftUI
 import UIKit
 
 enum KB {
-    static let accent = Color(red: 0x53 / 255, green: 0xB4 / 255, blue: 0xA4 / 255)
-    static let accentSoft = Color(red: 0xE6 / 255, green: 0xF4 / 255, blue: 0xF1 / 255)
-    static let bg = Color(red: 0xF7 / 255, green: 0xF7 / 255, blue: 0xF9 / 255)
-    static let card = Color.white
-    static let text = Color(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255)
-    static let dim = Color(red: 0x8A / 255, green: 0x8A / 255, blue: 0x8E / 255)
-    static let line = Color(red: 0xEC / 255, green: 0xEC / 255, blue: 0xEF / 255)
-    static let warn = Color(red: 0xF5 / 255, green: 0xA5 / 255, blue: 0x24 / 255)
-    static let danger = Color(red: 0xE0 / 255, green: 0x6A / 255, blue: 0x6A / 255)
+    /// 跟随系统亮/暗自动切换
+    private static func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light) })
+    }
+
+    static let accent = dyn(0x53B4A4, 0x5FC4B3)
+    static let accentSoft = dyn(0xE6F4F1, 0x1B3A35)
+    static let bg = dyn(0xF7F7F9, 0x0B0B0D)
+    static let card = dyn(0xFFFFFF, 0x1C1C1E)
+    static let text = dyn(0x1C1C1E, 0xF2F2F5)
+    static let dim = dyn(0x8A8A8E, 0x9A9A9F)
+    static let line = dyn(0xECECEF, 0x2C2C2E)
+    static let warn = dyn(0xF5A524, 0xF5A524)
+    static let danger = dyn(0xE06A6A, 0xE88080)
+    /// 强调色上的文字（两套主题下都用白字，accent 足够深）
+    static let onAccent = Color.white
+}
+
+extension UIColor {
+    convenience init(hex: UInt32) {
+        self.init(red: CGFloat((hex >> 16) & 0xFF) / 255,
+                  green: CGFloat((hex >> 8) & 0xFF) / 255,
+                  blue: CGFloat(hex & 0xFF) / 255,
+                  alpha: 1)
+    }
 }
 
 /// 白色圆角卡片
@@ -96,8 +112,8 @@ struct KBButton: View {
             .font(.system(size: 15, weight: .semibold))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .foregroundStyle(filled ? Color.white : tint)
-            .background(filled ? tint : Color.white)
+            .foregroundStyle(filled ? KB.onAccent : tint)
+            .background(filled ? tint : KB.card)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)

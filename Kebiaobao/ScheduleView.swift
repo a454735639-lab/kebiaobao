@@ -31,7 +31,7 @@ struct ScheduleView: View {
                     Button { addSheet = true } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(KB.onAccent)
                             .frame(width: 34, height: 34)
                             .background(KB.accent).clipShape(Circle())
                     }
@@ -125,7 +125,7 @@ struct ScheduleView: View {
                 VStack(spacing: 3) {
                     Text("\(cal.component(.day, from: d))")
                         .font(.system(size: 14, weight: isSel || isToday ? .semibold : .regular))
-                        .foregroundStyle(isSel ? .white : (isToday ? KB.accent : KB.text))
+                        .foregroundStyle(isSel ? KB.onAccent : (isToday ? KB.accent : KB.text))
                         .frame(width: 30, height: 30)
                         .background(isSel ? KB.accent : Color.clear)
                         .clipShape(Circle())
@@ -147,8 +147,18 @@ struct ScheduleView: View {
         let items = store.lessons(on: selected, babyID: store.currentBabyID)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text("\(selected, format: .dateTime.month().day())\(KBDate.weekdayName(cal.component(.weekday, from: selected)))")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                HStack(spacing: 8) {
+                    Text("\(selected, format: .dateTime.month().day())\(KBDate.weekdayName(cal.component(.weekday, from: selected)))")
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    if let label = Holiday.label(selected) {
+                        Text(label)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Holiday.isHoliday(selected) ? KB.danger : KB.warn)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background((Holiday.isHoliday(selected) ? KB.danger : KB.warn).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                }
                 if items.isEmpty {
                     Text("当天暂无排课")
                         .font(.system(size: 13)).foregroundStyle(KB.dim)
@@ -184,7 +194,7 @@ struct ScheduleView: View {
             } label: {
                 Text("扣课")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(KB.onAccent)
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(KB.accent).clipShape(Capsule())
             }
@@ -322,7 +332,7 @@ struct ManualEntryEditorView: View {
                     Color.clear.frame(width: 32, height: 32)
                 }
                 .padding(.horizontal, 12)
-                .background(Color.white.ignoresSafeArea())
+                .background(KB.bg.ignoresSafeArea())
                 .onAppear {
                     if let p = preset {
                         op = p.op; date = p.date; lessonsText = String(p.lessons)
@@ -360,8 +370,8 @@ struct ManualEntryEditorView: View {
                 .font(.system(size: 14, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
-                .foregroundStyle(sel ? Color.white : KB.text)
-                .background(sel ? tint : Color.white)
+                .foregroundStyle(sel ? KB.onAccent : KB.text)
+                .background(sel ? tint : KB.card)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -415,7 +425,7 @@ struct ManualEntryEditorView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color.white.ignoresSafeArea())
+                .background(KB.bg.ignoresSafeArea())
             }
             .toolbar(.hidden, for: .navigationBar)
         }

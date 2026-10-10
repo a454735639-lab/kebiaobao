@@ -169,6 +169,14 @@ struct HomeView: View {
                     .clipShape(Capsule())
                 Text("\(date, format: .dateTime.month().day()) \(KBDate.weekdayName(KBDate.cal.component(.weekday, from: date)))")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
+                if let hl = Holiday.label(date) {
+                    Text(hl)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Holiday.isHoliday(date) ? KB.danger : KB.warn)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background((Holiday.isHoliday(date) ? KB.danger : KB.warn).opacity(0.12))
+                        .clipShape(Capsule())
+                }
             }
             ForEach(items) { t in
                 lessonRow(t, date: date)

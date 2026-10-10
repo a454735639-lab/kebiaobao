@@ -228,13 +228,31 @@ struct LedgerRow: View {
     let entry: LedgerEntry
     var showUndo: Bool = true
 
+    @State private var editing = false
+    @State private var draft = ""
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(store.course(entry.courseID)?.name ?? "课程")
                     .font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
-                Text("\(KBDate.mdhm.string(from: entry.date))  \(entry.note)")
-                    .font(.system(size: 11)).foregroundStyle(KB.dim)
+                HStack(spacing: 4) {
+                    Text(KBDate.mdhm.string(from: entry.date))
+                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    if entry.note.isEmpty {
+                        Text("加备注")
+                            .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
+                    } else {
+                        Text(entry.note)
+                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                draft = entry.note
+                editing = true
             }
             Spacer()
             if entry.kind != .leave {
@@ -254,6 +272,13 @@ struct LedgerRow: View {
             }
         }
         .padding(.vertical, 9)
+        .alert("备注", isPresented: $editing) {
+            TextField("如：调课到周六", text: $draft)
+            Button("取消", role: .cancel) {}
+            Button("保存") { store.updateNote(entry, note: draft) }
+        } message: {
+            Text("\(store.course(entry.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: entry.date))")
+        }
     }
 }
 
@@ -318,7 +343,7 @@ struct LedgerListView: View {
         Button(action: action) {
             Text(t)
                 .font(.system(size: 13, weight: active ? .semibold : .regular))
-                .foregroundStyle(active ? .white : KB.text)
+                .foregroundStyle(active ? KB.onAccent : KB.text)
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(active ? KB.accent : KB.card)
                 .clipShape(Capsule())

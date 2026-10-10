@@ -76,7 +76,7 @@ struct TemplateEditorView: View {
                                         } label: {
                                             Text(KBDate.weekdayName(w).replacingOccurrences(of: "周", with: ""))
                                                 .font(.system(size: 14, weight: .medium))
-                                                .foregroundStyle(on ? .white : KB.text)
+                                                .foregroundStyle(on ? KB.onAccent : KB.text)
                                                 .frame(maxWidth: .infinity)
                                                 .frame(height: 36)
                                                 .background(on ? KB.accent : KB.bg)
