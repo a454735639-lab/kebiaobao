@@ -35,9 +35,12 @@ struct Course: Identifiable, Codable, Hashable {
     var pricePerLesson: Double
     var expiry: Date
     var createdAt: Date = Date()
+    /// 购买时间（旧数据回退到 createdAt）
+    var purchasedAt: Date? = nil
     var archived: Bool = false
 
     var totalFee: Double { Double(total) * pricePerLesson }
+    var boughtAt: Date { purchasedAt ?? createdAt }
 }
 
 /// 排课模板：按星期重复

@@ -204,9 +204,6 @@ struct HomeView: View {
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             HStack(spacing: 10) {
-                KBButton(title: "调课", filled: false, tint: KB.accent) {
-                    sheet = .manual(t, date, .consume)
-                }
                 KBButton(title: "请假", filled: false, tint: KB.dim) {
                     sheet = .manual(t, date, .leave)
                 }

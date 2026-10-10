@@ -6,14 +6,15 @@ struct ScheduleView: View {
     @State private var selected = KBDate.day(Date())
     @State private var addSheet = false
     @State private var sheet: SchedSheet?
+    @State private var mode: CalMode = .week
+
+    enum CalMode { case week, month }
 
     enum SchedSheet: Identifiable {
         case checkIn(LessonTemplate)
-        case manual(LessonTemplate, Store.ManualOp)
         var id: String {
             switch self {
             case .checkIn(let t): return "ci-\(t.id)"
-            case .manual(let t, let op): return "mn-\(t.id)-\(op)"
             }
         }
     }
@@ -26,8 +27,12 @@ struct ScheduleView: View {
                 KB.bg.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 14) {
-                        monthCard
-                        dayCard
+                        if mode == .month {
+                            monthCard
+                            monthDayCard
+                        } else {
+                            weekCard
+                        }
                         Color.clear.frame(height: 80)
                     }
                     .padding(.horizontal, 16)
@@ -40,6 +45,18 @@ struct ScheduleView: View {
                     Text("课表日程")
                         .font(.system(size: 24, weight: .bold)).foregroundStyle(KB.text)
                     Spacer()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            mode = mode == .week ? .month : .week
+                        }
+                    } label: {
+                        Text(mode == .week ? "月" : "周")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(KB.accent)
+                            .frame(width: 34, height: 34)
+                            .background(KB.accentSoft).clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
                     Button { addSheet = true } label: {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .semibold))
@@ -57,11 +74,101 @@ struct ScheduleView: View {
             .sheet(item: $sheet) { s in
                 switch s {
                 case .checkIn(let t): CheckInSheet(template: t, date: selected)
-                case .manual(let t, let op):
-                    ManualEntryEditorView(preset: (t.courseID, op, t.deduct, selected),
-                                          onDone: { sheet = nil })
                 }
             }
+        }
+    }
+
+    // MARK: - 周视图（日程列表）
+
+    /// 选中日期所在周的周一
+    private var weekStart: Date {
+        let wd = cal.component(.weekday, from: selected)   // 1=周日
+        let back = (wd + 5) % 7                            // 周一=0
+        return cal.date(byAdding: .day, value: -back, to: KBDate.day(selected)) ?? selected
+    }
+
+    private var weekDays: [Date] {
+        (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: weekStart) }
+    }
+
+    private var weekCard: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Button { shift(-1) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.text)
+                }
+                Text(weekTitle)
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    .frame(maxWidth: .infinity)
+                Button { shift(1) } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.text)
+                }
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 2)
+
+            ForEach(weekDays, id: \.self) { d in
+                weekSection(d)
+            }
+        }
+    }
+
+    private var weekTitle: String {
+        let end = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "M月d日"
+        return "\(f.string(from: weekStart)) - \(f.string(from: end))"
+    }
+
+    private func weekSection(_ d: Date) -> some View {
+        let items = store.lessons(on: d, babyID: store.currentBabyID)
+        let isToday = KBDate.isSameDay(d, Date())
+        let wd = cal.component(.weekday, from: d)
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "zh_CN")
+        df.dateFormat = "M/d"
+        return Card(padding: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("\(KBDate.weekdayName(wd)) \(df.string(from: d))")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(isToday ? KB.accent : KB.text)
+                    if isToday {
+                        Text("今天")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(KB.onAccent)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(KB.accent).clipShape(Capsule())
+                    }
+                    if let label = Holiday.label(d) {
+                        Text(label)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Holiday.isHoliday(d) ? KB.danger : KB.warn)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background((Holiday.isHoliday(d) ? KB.danger : KB.warn).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
+                if items.isEmpty {
+                    Text("暂无排课")
+                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(items) { t in row(t, on: d) }
+                }
+            }
+        }
+    }
+
+    private func shift(_ n: Int) {
+        let unit: Calendar.Component = mode == .month ? .month : .weekOfYear
+        if let d = cal.date(byAdding: unit, value: n, to: mode == .month ? month : selected) {
+            if mode == .month { month = d } else { selected = KBDate.day(d) }
         }
     }
 
@@ -101,9 +208,8 @@ struct ScheduleView: View {
         return f.string(from: month)
     }
 
-    private func shift(_ n: Int) {
-        if let d = cal.date(byAdding: .month, value: n, to: month) { month = d }
-    }
+    /// 月视图下选中那天的排课
+    private var monthDayCard: some View { weekSection(selected) }
 
     /// 周一起始的 6 行网格
     private var gridDays: [Date?] {
@@ -138,61 +244,54 @@ struct ScheduleView: View {
     @ViewBuilder
     private func dayCell(_ d: Date?) -> some View {
         if let d {
-            let has = !store.lessons(on: d, babyID: store.currentBabyID).isEmpty
+            let items = store.lessons(on: d, babyID: store.currentBabyID)
             let isSel = KBDate.isSameDay(d, selected)
             let isToday = KBDate.isSameDay(d, Date())
+            let wd = cal.component(.weekday, from: d)
             Button { selected = d } label: {
-                VStack(spacing: 3) {
+                VStack(spacing: 2) {
                     Text("\(cal.component(.day, from: d))")
-                        .font(.system(size: 14, weight: isSel || isToday ? .semibold : .regular))
+                        .font(.system(size: 13, weight: isSel || isToday ? .semibold : .regular))
                         .foregroundStyle(isSel ? KB.onAccent : (isToday ? KB.accent : KB.text))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 24, height: 24)
                         .background(isSel ? KB.accent : Color.clear)
                         .clipShape(Circle())
-                    Circle()
-                        .fill(has ? (isSel ? Color.clear : KB.accent) : Color.clear)
-                        .frame(width: 4, height: 4)
+                    ForEach(items.prefix(2)) { t in
+                        let s = t.slot(for: wd)
+                        VStack(spacing: 0) {
+                            Text(s.timeText).font(.system(size: 8, weight: .semibold))
+                                .foregroundStyle(KB.accent)
+                            Text(s.teacher.isEmpty ? (store.course(t.courseID)?.name ?? "")
+                                                   : s.teacher)
+                                .font(.system(size: 8)).foregroundStyle(KB.dim)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 2).padding(.vertical, 1)
+                        .background(KB.accentSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    }
+                    if items.count > 2 {
+                        Text("+\(items.count - 2)").font(.system(size: 8)).foregroundStyle(KB.dim)
+                    }
+                    Spacer(minLength: 0)
                 }
-                .frame(height: 40)
+                .frame(height: 62, alignment: .top)
+                .frame(maxWidth: .infinity)
+                .background(isSel ? KB.accentSoft.opacity(0.5) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
         } else {
-            Color.clear.frame(height: 40)
+            Color.clear.frame(height: 62)
         }
     }
 
     // MARK: - 当天
 
-    private var dayCard: some View {
-        let items = store.lessons(on: selected, babyID: store.currentBabyID)
-        return Card {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Text("\(selected, format: .dateTime.month().day())\(KBDate.weekdayName(cal.component(.weekday, from: selected)))")
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                    if let label = Holiday.label(selected) {
-                        Text(label)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Holiday.isHoliday(selected) ? KB.danger : KB.warn)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background((Holiday.isHoliday(selected) ? KB.danger : KB.warn).opacity(0.12))
-                            .clipShape(Capsule())
-                    }
-                }
-                if items.isEmpty {
-                    Text("当天暂无排课")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
-                        .frame(maxWidth: .infinity).padding(.vertical, 18)
-                } else {
-                    ForEach(items) { t in row(t) }
-                }
-            }
-        }
-    }
-
-    private func row(_ t: LessonTemplate) -> some View {
+    private func row(_ t: LessonTemplate, on day: Date) -> some View {
         let c = store.course(t.courseID)
-        let s = t.slot(for: KBDate.cal.component(.weekday, from: selected))
+        let s = t.slot(for: KBDate.cal.component(.weekday, from: day))
         return HStack(spacing: 12) {
             VStack(spacing: 2) {
                 Text(s.timeText)
@@ -209,24 +308,14 @@ struct ScheduleView: View {
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             Spacer()
-            HStack(spacing: 6) {
-                Button { sheet = .manual(t, .consume) } label: {
-                    Text("调课")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(KB.accent)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(KB.accentSoft).clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                Button { sheet = .checkIn(t) } label: {
-                    Text("扣课")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(KB.onAccent)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(KB.accent).clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            Button { selected = day; sheet = .checkIn(t) } label: {
+                Text("扣课")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(KB.onAccent)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(KB.accent).clipShape(Capsule())
             }
+            .buttonStyle(.plain)
         }
         .padding(10)
         .background(KB.bg)

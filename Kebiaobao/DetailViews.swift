@@ -96,6 +96,8 @@ struct CourseDetailView: View {
                 Divider()
                 row("单价", "¥\(String(format: "%g", current.pricePerLesson))/节")
                 Divider()
+                row("购买时间", KBDate.ymd.string(from: current.boughtAt))
+                Divider()
                 row("有效期至", KBDate.ymd.string(from: current.expiry))
                 Divider()
                 row("总费用", "¥\(String(format: "%.2f", current.totalFee))")

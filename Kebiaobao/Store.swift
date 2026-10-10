@@ -219,7 +219,7 @@ final class Store: ObservableObject {
         }
 
         var courseRows: [[String]] = [["ID", "宝贝ID", "宝贝", "课程", "标签",
-                                       "总课时", "已用", "剩余", "单价", "总价", "到期日"]]
+                                       "总课时", "已用", "剩余", "单价", "总价", "购买时间", "到期日"]]
         for c in cs {
             let used = consumed(c.id)
             courseRows.append([c.id.uuidString, c.babyID.uuidString,
@@ -227,6 +227,7 @@ final class Store: ObservableObject {
                                "\(c.total)", "\(used)", "\(c.total - used)",
                                String(format: "%g", c.pricePerLesson),
                                String(format: "%.2f", c.totalFee),
+                               KBDate.ymd.string(from: c.boughtAt),
                                KBDate.ymd.string(from: c.expiry)])
         }
 
@@ -316,7 +317,8 @@ final class Store: ObservableObject {
                            tag: r["标签"] ?? "",
                            total: Int(r["总课时"] ?? "") ?? 0,
                            pricePerLesson: Double(r["单价"] ?? "") ?? 0,
-                           expiry: KBDate.ymd.date(from: r["到期日"] ?? "") ?? Date())
+                           expiry: KBDate.ymd.date(from: r["到期日"] ?? "") ?? Date(),
+                           purchasedAt: KBDate.ymd.date(from: r["购买时间"] ?? ""))
             newCourses.append(c)
         }
         let courseIDs = Set(newCourses.map(\.id))

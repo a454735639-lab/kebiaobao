@@ -97,6 +97,7 @@ struct CourseEditorView: View {
     @State private var total = "12"
     @State private var price = ""
     @State private var expiry = Calendar.current.date(byAdding: .year, value: 1, to: Date())!
+    @State private var purchased = Date()
     @State private var advance = false
     @State private var advanceLessons = ""
     @State private var advancePrice = ""
@@ -120,6 +121,10 @@ struct CourseEditorView: View {
                                 FieldRow(label: "总课时*", text: $total, placeholder: "12", keyboard: .numberPad)
                                 Divider()
                                 FieldRow(label: "单价（元/节）*", text: $price, placeholder: "90", keyboard: .decimalPad)
+                                Divider()
+                                DatePicker("购买时间*", selection: $purchased, displayedComponents: .date)
+                                    .font(.system(size: 15))
+                                    .padding(.vertical, 8)
                                 Divider()
                                 DatePicker("有效期至*", selection: $expiry, displayedComponents: .date)
                                     .font(.system(size: 15))
@@ -173,6 +178,7 @@ struct CourseEditorView: View {
                     total = "\(c.total)"
                     price = String(format: "%g", c.pricePerLesson)
                     expiry = c.expiry
+                    purchased = c.boughtAt
                 }
             }
         }
@@ -198,16 +204,18 @@ struct CourseEditorView: View {
             store.courses[i].total = t
             store.courses[i].pricePerLesson = p
             store.courses[i].expiry = KBDate.day(expiry)
+            store.courses[i].purchasedAt = KBDate.day(purchased)
             if advance, let add = Int(advanceLessons), add > 0 {
                 let np = Double(advancePrice) ?? 0
                 store.charge(c.id, lessons: add, price: np, note: "续费")
             }
         } else {
             let c = Course(babyID: babyID, name: n, tag: tag, total: t,
-                           pricePerLesson: p, expiry: KBDate.day(expiry))
+                           pricePerLesson: p, expiry: KBDate.day(expiry),
+                           purchasedAt: KBDate.day(purchased))
             store.courses.append(c)
             if t > 0 {
-                store.ledger.append(LedgerEntry(courseID: c.id, date: Date(),
+                store.ledger.append(LedgerEntry(courseID: c.id, date: KBDate.day(purchased),
                                                 delta: t, kind: .charge, note: "初始购买"))
             }
         }
