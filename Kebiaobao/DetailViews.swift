@@ -535,7 +535,7 @@ struct AnalyticsView: View {
 
     /// 当期各课程消耗（用于环形图）
     private var slices: [Slice] {
-        list.map { Slice(id: $0.id, name: $0.name, color: $0.color,
+        list.map { Slice(id: $0.id.uuidString, name: $0.name, color: $0.color,
                          value: store.consumed($0.id, in: period)) }
             .filter { $0.value > 0 }
             .sorted { $0.value > $1.value }
@@ -543,23 +543,25 @@ struct AnalyticsView: View {
 
     private var sliceTotal: Int { slices.reduce(0) { $0 + $1.value } }
 
-    /// 当期消课类型分布
+    /// 当期消课类型分布（一次遍历 ledger，按 kind 累加）
     private var kindSlices: [Slice] {
-        RecordKind.allCases.compactMap { k in
-            let v = store.ledger.filter { e in
-                guard e.kind == k, e.delta < 0 else { return false }
-                guard let p = period else { return true }
-                return KBDate.cal.isDate(e.date, equalTo: p, toGranularity: .month)
-            }.reduce(0) { $0 + abs($1.delta) }
-            guard v > 0 else { return nil }
-            return Slice(id: UUID(), name: k.label,
+        var acc: [RecordKind: Int] = [:]
+        for e in store.ledger where e.delta < 0 {
+            if let p = period,
+               !KBDate.cal.isDate(e.date, equalTo: p, toGranularity: .month) { continue }
+            acc[e.kind, default: 0] += abs(e.delta)
+        }
+        return RecordKind.allCases.compactMap { k in
+            guard let v = acc[k], v > 0 else { return nil }
+            return Slice(id: k.label, name: k.label,
                          color: k == .consume ? KBPalette.colors[0] : KBPalette.colors[2],
                          value: v)
         }
     }
 
     struct Slice: Identifiable {
-        let id: UUID
+        /// 用稳定字符串做主键：原来消课类型用 UUID()，每次 body 求值都是全新身份，ForEach 全量重建
+        let id: String
         let name: String
         let color: UInt32
         let value: Int
@@ -647,8 +649,7 @@ struct AnalyticsView: View {
                                 Text("暂无课程").font(.system(size: 13)).foregroundStyle(KB.dim)
                             } else {
                                 ForEach(list) { c in
-                                    let used = store.consumed(c.id)
-                                    let sp = store.spent(c.id)
+                                    let (used, sp) = store.usedAndSpent(c.id)
                                     VStack(alignment: .leading, spacing: 7) {
                                         HStack {
                                             Circle().fill(Color.course(c.color))

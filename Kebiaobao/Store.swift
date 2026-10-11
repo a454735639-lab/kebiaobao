@@ -3,9 +3,44 @@ import SwiftUI
 
 final class Store: ObservableObject {
     @Published var babies: [Baby] = []
-    @Published var courses: [Course] = []
+    @Published var courses: [Course] = [] {
+        didSet { statsDirty = true }
+    }
     @Published var templates: [LessonTemplate] = []
-    @Published var ledger: [LedgerEntry] = []
+    @Published var ledger: [LedgerEntry] = [] {
+        didSet { statsDirty = true }
+    }
+
+    // MARK: - 统计缓存
+    //
+    // consumed/spent 原本每次调用都全表扫一遍 ledger，而它们又被放进 ForEach 的每一行里，
+    // 于是渲染成本是 O(课程数 × 流水数)。这里缓存一份按课程聚合的结果，ledger/courses 变化时才重算。
+
+    private var statsDirty = true
+    private var statCache: [UUID: (used: Int, spent: Double)] = [:]
+
+    private func stats() -> [UUID: (used: Int, spent: Double)] {
+        if statsDirty {
+            var m: [UUID: (used: Int, spent: Double)] = [:]
+            let price = Dictionary(courses.map { ($0.id, $0.pricePerLesson) }, uniquingKeysWith: { a, _ in a })
+            for e in ledger where e.delta < 0 {
+                let n = abs(e.delta)
+                let p = e.unitPrice ?? price[e.courseID] ?? 0
+                var cur = m[e.courseID] ?? (0, 0)
+                cur.used += n
+                cur.spent += Double(n) * p
+                m[e.courseID] = cur
+            }
+            statCache = m
+            statsDirty = false
+        }
+        return statCache
+    }
+
+    /// 一次性取某课程的已消耗/已花费，避免两趟全表扫
+    func usedAndSpent(_ courseID: UUID) -> (used: Int, spent: Double) {
+        stats()[courseID] ?? (0, 0)
+    }
     @Published var currentBabyID: UUID?
     /// true = 显示全部宝贝的数据（currentBabyID 被忽略）
     @Published var allBabies = false
@@ -24,6 +59,8 @@ final class Store: ObservableObject {
 
     /// 最近一次覆盖式导入前的自动快照
     private var backupURL: URL { dir.appendingPathComponent("kebiaobao.backup.json") }
+    /// 解析失败时的现场留存（供人工/后续恢复）
+    private var badURL: URL { dir.appendingPathComponent("kebiaobao.bad.json") }
 
     var hasBackup: Bool { FileManager.default.fileExists(atPath: backupURL.path) }
 
@@ -40,21 +77,35 @@ final class Store: ObservableObject {
         var currentBabyID: UUID?
     }
 
+    /// 上次启动时本地数据无法解析。为 true 时禁止写盘，避免把坏文件覆盖掉。
+    @Published var loadFailed = false
+
     init() { load() }
 
     // MARK: - 持久化
 
     func load() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let s = try? JSONDecoder.kb.decode(Snapshot.self, from: data) else { return }
-        babies = s.babies
-        courses = s.courses
-        templates = s.templates
-        ledger = s.ledger
-        currentBabyID = s.currentBabyID ?? s.babies.first?.id
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        guard let data = try? Data(contentsOf: fileURL) else { return }
+        do {
+            let s = try JSONDecoder.kb.decode(Snapshot.self, from: data)
+            babies = s.babies
+            courses = s.courses
+            templates = s.templates
+            ledger = s.ledger
+            currentBabyID = s.currentBabyID ?? s.babies.first?.id
+            loadFailed = false
+        } catch {
+            // 解析失败：另存现场供人工恢复，并停止写盘（否则下一次改动就会覆盖掉原始数据）
+            loadFailed = true
+            try? FileManager.default.removeItem(at: badURL)
+            try? FileManager.default.copyItem(at: fileURL, to: badURL)
+        }
     }
 
     func save() {
+        // ponytail: 解析失败时宁可这次改动不落盘，也不覆盖用户唯一的数据文件
+        guard !loadFailed else { return }
         write(snapshot(), to: fileURL)
     }
 
@@ -93,6 +144,8 @@ final class Store: ObservableObject {
         ledger = s.ledger
         currentBabyID = s.currentBabyID ?? s.babies.first?.id
         if allBabies && babies.count <= 1 { allBabies = false }
+        // 恢复/导入的数据是可信的，解除「解析失败停写盘」锁，否则恢复结果落不了盘
+        loadFailed = false
         save()
     }
 
@@ -116,17 +169,10 @@ final class Store: ObservableObject {
     }
 
     /// 已消耗课时（正数）
-    func consumed(_ courseID: UUID) -> Int {
-        ledger.filter { $0.courseID == courseID && $0.delta < 0 }
-              .reduce(0) { $0 + abs($1.delta) }
-    }
+    func consumed(_ courseID: UUID) -> Int { stats()[courseID]?.used ?? 0 }
 
     /// 已花费金额：优先用记账当时的单价，旧数据回退课程当前单价
-    func spent(_ courseID: UUID) -> Double {
-        let c = course(courseID)
-        return ledger.filter { $0.courseID == courseID && $0.delta < 0 }
-            .reduce(0) { $0 + Double(abs($1.delta)) * ($1.unitPrice ?? c?.pricePerLesson ?? 0) }
-    }
+    func spent(_ courseID: UUID) -> Double { stats()[courseID]?.spent ?? 0 }
 
     func remaining(_ course: Course) -> Int { course.total - consumed(course.id) }
 
@@ -167,25 +213,15 @@ final class Store: ObservableObject {
     func lessons(on date: Date, babyID: UUID?) -> [LessonTemplate] {
         if isSkipped(date) { return [] }
         let w = KBDate.cal.component(.weekday, from: date)
+        // 先建索引：原来在 filter 里对每个模板各查一次 course(id)，是 O(模板 × 课程)
+        let byID = Dictionary(courses.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return templates.filter { t in
-            t.weekdays.contains(w) &&
-            (babyID == nil || course(t.courseID)?.babyID == babyID) &&
-            (course(t.courseID)?.archived == false)
+            guard t.weekdays.contains(w), let c = byID[t.courseID], !c.archived else { return false }
+            return babyID == nil || c.babyID == babyID
         }.sorted {
             let a = $0.slot(for: w), b = $1.slot(for: w)
             return (a.hour, a.minute) < (b.hour, b.minute)
         }
-    }
-
-    /// 未来 N 天内的具体课次（跳过法定节假日），按时间升序
-    func upcomingOccurrences(days: Int, babyID: UUID?) -> [(date: Date, template: LessonTemplate)] {
-        let today = KBDate.day(Date())
-        var out: [(Date, LessonTemplate)] = []
-        for off in 0..<days {
-            guard let d = KBDate.cal.date(byAdding: .day, value: off, to: today) else { continue }
-            for t in lessons(on: d, babyID: babyID) { out.append((d, t)) }
-        }
-        return out
     }
 
     /// 未来 N 天内有课的日期集合
@@ -330,6 +366,18 @@ final class Store: ObservableObject {
         save()
     }
 
+    /// 删除宝贝，连同其课程、排课、流水（原来只删宝贝和课程，留下孤儿排课与流水）
+    func deleteBaby(_ id: UUID) {
+        backupNow()
+        let courseIDs = Set(courses.filter { $0.babyID == id }.map { $0.id })
+        babies.removeAll { $0.id == id }
+        courses.removeAll { $0.babyID == id }
+        templates.removeAll { courseIDs.contains($0.courseID) }
+        ledger.removeAll { courseIDs.contains($0.courseID) }
+        if currentBabyID == id { currentBabyID = babies.first?.id }
+        save()
+    }
+
     // MARK: - Excel 导出 / 导入
 
     /// 单课程导出：只含该课程及其排课、流水、所属宝贝
@@ -426,8 +474,11 @@ final class Store: ObservableObject {
         let courseCount: Int
         let templateCount: Int
         let ledgerCount: Int
+        /// 被跳过的行（日期无法识别等），让用户在确认前看到
+        var skipped: [String] = []
         var summary: String {
-            "宝贝 \(babyCount) · 课程 \(courseCount) · 排课 \(templateCount) · 流水 \(ledgerCount)"
+            let base = "宝贝 \(babyCount) · 课程 \(courseCount) · 排课 \(templateCount) · 流水 \(ledgerCount)"
+            return skipped.isEmpty ? base : base + "\n跳过 \(skipped.count) 行：\n" + skipped.prefix(5).joined(separator: "\n")
         }
     }
 
@@ -459,12 +510,17 @@ final class Store: ObservableObject {
                 throw NSError(domain: "kb", code: 5, userInfo: [NSLocalizedDescriptionKey:
                     "课程「\(name)」的宝贝ID 在「宝贝」表里找不到，导入会丢数据。请检查导出文件是否完整。"])
             }
+            // 到期日解析不出来时不能静默变成「今天」——那会让课程立刻显示为已过期
+            guard let exp = KBDate.ymd.date(from: r["到期日"] ?? "") else {
+                throw NSError(domain: "kb", code: 6, userInfo: [NSLocalizedDescriptionKey:
+                    "课程「\(name)」的到期日「\(r["到期日"] ?? "")」无法识别（应为 2026-01-31 这样的格式）。"])
+            }
             let c = Course(id: UUID(uuidString: r["ID"] ?? "") ?? UUID(),
                            babyID: bid, name: name,
                            tag: r["标签"] ?? "",
                            total: Int(r["总课时"] ?? "") ?? 0,
                            pricePerLesson: Double(r["单价"] ?? "") ?? 0,
-                           expiry: KBDate.ymd.date(from: r["到期日"] ?? "") ?? Date(),
+                           expiry: exp,
                            purchasedAt: KBDate.ymd.date(from: r["购买时间"] ?? ""))
             newCourses.append(c)
         }
@@ -510,10 +566,15 @@ final class Store: ObservableObject {
         let kinds: [String: RecordKind] = Dictionary(uniqueKeysWithValues:
             RecordKind.allCases.map { ($0.label, $0) })
         var newLedger: [LedgerEntry] = []
+        var badRows: [String] = []
         for r in table(sheets, "流水", requiring: ["流水ID", "课程ID"]) {
             guard let cid = UUID(uuidString: r["课程ID"] ?? ""), courseIDs.contains(cid) else { continue }
-            let date = KBDate.mdhm.date(from: r["日期"] ?? "")
-                ?? KBDate.ymd.date(from: r["日期"] ?? "") ?? Date()
+            // 日期解析失败就跳过该行并记录，而不是静默记成「今天」
+            guard let date = KBDate.mdhm.date(from: r["日期"] ?? "")
+                    ?? KBDate.ymd.date(from: r["日期"] ?? "") else {
+                badRows.append("流水日期「\(r["日期"] ?? "")」无法识别")
+                continue
+            }
             let sum = (r["课后小结"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             newLedger.append(LedgerEntry(
                 id: UUID(uuidString: r["流水ID"] ?? "") ?? UUID(),
@@ -535,7 +596,8 @@ final class Store: ObservableObject {
                                templates: newTemplates, ledger: newLedger,
                                currentBabyID: newBabies.first?.id),
             babyCount: newBabies.count, courseCount: newCourses.count,
-            templateCount: newTemplates.count, ledgerCount: newLedger.count)
+            templateCount: newTemplates.count, ledgerCount: newLedger.count,
+            skipped: badRows)
     }
 
     /// 应用一份已解析的导入结果（用户确认后调用）

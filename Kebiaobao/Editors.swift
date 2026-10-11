@@ -38,10 +38,7 @@ struct BabyEditorView: View {
                         }
                         if store.babies.count > 1, let b = baby {
                             KBButton(title: "删除该宝贝及其数据", filled: false, tint: KB.danger) {
-                                store.babies.removeAll { $0.id == b.id }
-                                store.courses.removeAll { $0.babyID == b.id }
-                                if store.currentBabyID == b.id { store.currentBabyID = store.babies.first?.id }
-                                store.save()
+                                store.deleteBaby(b.id)
                                 dismiss()
                             }
                         }

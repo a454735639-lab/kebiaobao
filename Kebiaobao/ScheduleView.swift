@@ -454,7 +454,7 @@ struct ManualEntryEditorView: View {
                     .padding(.bottom, 40)
                 }
                 if let id = courseID {
-                    Text("当前：\(store.course(id)?.name ?? "") · 剩余 \(store.remaining(store.course(id)!)) 课时")
+                    Text(currentCourseText)
                         .font(.system(size: 12)).foregroundStyle(KB.dim)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 4)
@@ -571,6 +571,12 @@ struct ManualEntryEditorView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+    }
+
+    /// 底部当前课程提示（课程可能在 sheet 打开期间被归档/删除/被导入覆盖）
+    private var currentCourseText: String {
+        guard let id = courseID, let c = store.course(id) else { return "当前：—" }
+        return "当前：\(c.name) · 剩余 \(store.remaining(c)) 课时"
     }
 
     private func save() {

@@ -73,7 +73,7 @@ enum CalendarSync {
 
                 var count = 0
                 let today = KBDate.day(Date())
-                let courseByID = Dictionary(uniqueKeysWithValues: courses.map { ($0.id, $0) })
+                let courseByID = Dictionary(courses.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
 
                 for offset in 0..<days {
                     guard let day = KBDate.cal.date(byAdding: .day, value: offset, to: today) else { continue }

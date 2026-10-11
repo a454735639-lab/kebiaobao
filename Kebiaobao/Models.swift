@@ -48,6 +48,31 @@ struct Course: Identifiable, Codable, Hashable {
     var color: UInt32 {
         colorHex ?? KBPalette.forID(id)
     }
+
+    init(id: UUID = UUID(), babyID: UUID, name: String, tag: String, total: Int,
+         pricePerLesson: Double, expiry: Date, createdAt: Date = Date(),
+         purchasedAt: Date? = nil, archived: Bool = false, colorHex: UInt32? = nil) {
+        self.id = id; self.babyID = babyID; self.name = name; self.tag = tag
+        self.total = total; self.pricePerLesson = pricePerLesson; self.expiry = expiry
+        self.createdAt = createdAt; self.purchasedAt = purchasedAt
+        self.archived = archived; self.colorHex = colorHex
+    }
+
+    /// 手写解码：合成的 init(from:) 会忽略属性默认值，旧快照缺键就会整包解码失败
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        babyID = try c.decode(UUID.self, forKey: .babyID)
+        name = try c.decode(String.self, forKey: .name)
+        tag = try c.decodeIfPresent(String.self, forKey: .tag) ?? ""
+        total = try c.decode(Int.self, forKey: .total)
+        pricePerLesson = try c.decode(Double.self, forKey: .pricePerLesson)
+        expiry = try c.decode(Date.self, forKey: .expiry)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        purchasedAt = try c.decodeIfPresent(Date.self, forKey: .purchasedAt)
+        archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
+        colorHex = try c.decodeIfPresent(UInt32.self, forKey: .colorHex)
+    }
 }
 
 /// 每科一色：柔和低饱和调色板（浅色底上可读，深色模式下也够亮）
@@ -105,6 +130,30 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
         guard let f = s.first else { return true }
         return s.allSatisfy { $0.hour == f.hour && $0.minute == f.minute && $0.teacher == f.teacher }
     }
+
+    /// 手写解码：`slots` / `remindMinutes` 等后加字段在旧快照里不存在，
+    /// 合成的 init(from:) 会当必填直接抛错，整包数据就废了。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        courseID = try c.decode(UUID.self, forKey: .courseID)
+        weekdays = try c.decodeIfPresent([Int].self, forKey: .weekdays) ?? []
+        hour = try c.decodeIfPresent(Int.self, forKey: .hour) ?? 0
+        minute = try c.decodeIfPresent(Int.self, forKey: .minute) ?? 0
+        place = try c.decodeIfPresent(String.self, forKey: .place) ?? ""
+        teacher = try c.decodeIfPresent(String.self, forKey: .teacher) ?? ""
+        deduct = try c.decodeIfPresent(Int.self, forKey: .deduct) ?? 1
+        remindMinutes = try c.decodeIfPresent(Int.self, forKey: .remindMinutes) ?? 30
+        slots = try c.decodeIfPresent([DaySlot].self, forKey: .slots) ?? []
+    }
+
+    init(id: UUID = UUID(), courseID: UUID, weekdays: [Int], hour: Int, minute: Int,
+         place: String, teacher: String, deduct: Int, remindMinutes: Int,
+         slots: [DaySlot] = []) {
+        self.id = id; self.courseID = courseID; self.weekdays = weekdays
+        self.hour = hour; self.minute = minute; self.place = place; self.teacher = teacher
+        self.deduct = deduct; self.remindMinutes = remindMinutes; self.slots = slots
+    }
 }
 
 /// 某个星期几的上课安排
@@ -131,6 +180,25 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var summary: String? = nil
     /// 记账当时的单价（旧数据为 nil，回退到课程当前单价）
     var unitPrice: Double? = nil
+
+    init(id: UUID = UUID(), courseID: UUID, date: Date, delta: Int,
+         kind: RecordKind, note: String, summary: String? = nil, unitPrice: Double? = nil) {
+        self.id = id; self.courseID = courseID; self.date = date; self.delta = delta
+        self.kind = kind; self.note = note; self.summary = summary; self.unitPrice = unitPrice
+    }
+
+    /// 手写解码：`summary` / `unitPrice` 在旧快照里不存在
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        courseID = try c.decode(UUID.self, forKey: .courseID)
+        date = try c.decode(Date.self, forKey: .date)
+        delta = try c.decode(Int.self, forKey: .delta)
+        kind = try c.decode(RecordKind.self, forKey: .kind)
+        note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
+        summary = try c.decodeIfPresent(String.self, forKey: .summary)
+        unitPrice = try c.decodeIfPresent(Double.self, forKey: .unitPrice)
+    }
 }
 
 extension JSONEncoder {
@@ -180,20 +248,5 @@ enum KBDate {
 
     static func weekdayName(_ w: Int) -> String {
         (w >= 1 && w <= 7) ? weekdayCN[w] : ""
-    }
-
-    /// 生成某月内所有匹配 weekdays 的日期
-    static func occurrences(weekdays: [Int], in month: Date) -> [Date] {
-        guard !weekdays.isEmpty else { return [] }
-        var comps = cal.dateComponents([.year, .month], from: month)
-        comps.day = 1
-        guard let first = cal.date(from: comps),
-              let range = cal.range(of: .day, in: .month, for: month) else { return [] }
-        var out: [Date] = []
-        for offset in 0..<range.count {
-            guard let d = cal.date(byAdding: .day, value: offset, to: first) else { continue }
-            if weekdays.contains(cal.component(.weekday, from: d)) { out.append(d) }
-        }
-        return out
     }
 }

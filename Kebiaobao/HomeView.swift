@@ -128,11 +128,13 @@ struct HomeView: View {
     private var statCard: some View {
         let list = store.courses(for: store.scope)
         let remain = list.reduce(0) { $0 + store.remaining($1) }
+        // 进行中 = 还有剩余课时的课程（原来与「总课程」都是 list.count，恒等）
+        let active = list.filter { store.remaining($0) > 0 }.count
         return Card {
             HStack(spacing: 0) {
                 StatTile(value: "\(list.count)", label: "总课程")
                 Divider().frame(height: 34)
-                StatTile(value: "\(list.count)", label: "进行中")
+                StatTile(value: "\(active)", label: "进行中")
                 Divider().frame(height: 34)
                 StatTile(value: "\(remain)", label: "剩余课时",
                          tint: remain <= 3 ? KB.danger : KB.accent)
@@ -171,8 +173,9 @@ struct HomeView: View {
 
     private func dayBlock(_ date: Date) -> some View {
         let today = KBDate.day(Date())
+        let tomorrow = KBDate.cal.date(byAdding: .day, value: 1, to: today)
         let label: String = KBDate.isSameDay(date, today) ? "今天"
-            : (KBDate.isSameDay(date, KBDate.cal.date(byAdding: .day, value: 1, to: today)!) ? "明天" : "后天")
+            : (tomorrow.map { KBDate.isSameDay(date, $0) } == true ? "明天" : "后天")
         let items = store.lessons(on: date, babyID: store.scope)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {

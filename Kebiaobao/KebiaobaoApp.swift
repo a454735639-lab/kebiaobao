@@ -25,6 +25,8 @@ enum KBAppearance: String, CaseIterable, Identifiable {
 struct KebiaobaoApp: App {
     @StateObject private var store = Store()
     @AppStorage("kb.appearance") private var appearance = KBAppearance.system.rawValue
+    /// 提醒重建的防抖句柄
+    @State private var resyncWork: DispatchWorkItem?
 
     var body: some Scene {
         WindowGroup {
@@ -64,13 +66,16 @@ struct RootView: View {
         .onAppear { applyTabBar() }
         // scheme 变化时重建 tab bar 外观
         .onChange(of: scheme) { _, _ in applyTabBar() }
-        // 排课／课程变动后重建提醒
+        // 排课／课程变动后重建提醒（防抖 1s：数组每次改动都全量重建通知太浪费）
         .onChange(of: store.templates) { _, _ in resyncReminders() }
         .onChange(of: store.courses) { _, _ in resyncReminders() }
     }
 
     private func resyncReminders() {
-        KBReminder.sync(templates: store.templates, courses: store.courses)
+        resyncWork?.cancel()
+        let work = DispatchWorkItem { KBReminder.sync(templates: store.templates, courses: store.courses) }
+        resyncWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
     }
 
     private func applyTabBar() {

@@ -85,8 +85,9 @@ struct MeView: View {
 
     private func syncCalendar() {
         calBusy = true
-        let remain = Dictionary(uniqueKeysWithValues: store.courses.map { ($0.id, max(0, store.remaining($0))) })
-        CalendarSync.sync(templates: store.templates, courses: store.courses, remaining: remain) { r in
+        let remain = Dictionary(store.courses.map { ($0.id, max(0, store.remaining($0))) }, uniquingKeysWith: { a, _ in a })
+        CalendarSync.sync(templates: store.templates, courses: store.courses, remaining: remain,
+                          skipHolidays: store.skipHolidays) { r in
             calBusy = false
             switch r {
             case .ok(let n): toast = "已同步 \(n) 条排课到系统日历"
@@ -110,6 +111,7 @@ struct MeView: View {
                 KB.bg.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 14) {
+                        if store.loadFailed { loadFailedBanner }
                         profileCard
                         statCard
                         group("数据管理") {
@@ -170,6 +172,10 @@ struct MeView: View {
             }
             .sheet(isPresented: $showImport) { importSheet }
             .onAppear { refreshNotifyStatus() }
+            // 开关变动后重写日历，否则关了「节假日不排课」日历仍是旧的跳过结果
+            .onChange(of: store.skipHolidays) { _, _ in
+                if calendarSync { syncCalendar() }
+            }
             .sheet(item: $pending) { p in importConfirmSheet(p) }
             .sheet(item: $shareItem) { item in
                 ShareSheet(url: item.url)
@@ -200,6 +206,27 @@ struct MeView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("当前数据会被备份内容覆盖。")
+            }
+        }
+    }
+
+    /// 本地数据无法解析时的提示条：阻止静默写盘，给出唯一的安全出口（从备份恢复）
+    private var loadFailedBanner: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("本地数据读取失败", systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.danger)
+                Text("原文件已另存为 kebiaobao.bad.json。为避免覆盖，本次启动不再写入任何改动。")
+                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                if store.hasBackup {
+                    KBButton(title: "从备份恢复", icon: "arrow.counterclockwise") {
+                        do { try store.restoreBackup(); toast = "已从备份恢复" }
+                        catch { toast = "恢复失败：\(error.localizedDescription)" }
+                    }
+                } else {
+                    Text("没有可用备份，请通过「导入 Excel」重建数据。")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                }
             }
         }
     }
