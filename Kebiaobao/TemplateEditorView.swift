@@ -17,8 +17,23 @@ struct TemplateEditorView: View {
     @State private var editingDay: Int?
     @State private var deduct = 1
     @State private var remind = 30
+    /// 共用年卡：这一节课算在哪个宝宝头上
+    @State private var ownerBabyID: UUID?
 
     private var list: [Course] { store.courses(for: store.scope) }
+
+    /// 已选课程挂在多个宝贝下时才需要选归属
+    private var ownerOptions: [Baby] {
+        guard let cid = selectedCourse, let c = store.course(cid), c.babyIDs.count > 1 else { return [] }
+        return c.babyIDs.compactMap { store.baby($0) }
+    }
+
+    /// 单宝贝课程不写归属（走课程默认），多宝贝时把用户选择固化下来
+    private var effectiveOwner: UUID? {
+        guard !ownerOptions.isEmpty else { return nil }
+        if let p = ownerBabyID, ownerOptions.contains(where: { $0.id == p }) { return p }
+        return ownerOptions.first?.id
+    }
 
     /// 每个选中星期，各自的安排
     private var orderedSlots: [DaySlot] {
@@ -57,6 +72,34 @@ struct TemplateEditorView: View {
                                 }
                             }
                             .padding(.horizontal, 16)
+                        }
+
+                        if !ownerOptions.isEmpty {
+                            Card {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text("这节课算谁的").font(.system(size: 14)).foregroundStyle(KB.text)
+                                        Spacer()
+                                        Text("共用课时 · 按归属记账")
+                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                    }
+                                    HStack(spacing: 8) {
+                                        ForEach(ownerOptions) { b in
+                                            let on = (ownerBabyID ?? ownerOptions.first?.id) == b.id
+                                            Button { ownerBabyID = b.id } label: {
+                                                Text(b.name)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundStyle(on ? KB.onAccent : KB.text)
+                                                    .frame(maxWidth: .infinity)
+                                                    .frame(height: 36)
+                                                    .background(on ? KB.accent : KB.bg)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         Card {
@@ -197,6 +240,7 @@ struct TemplateEditorView: View {
         defaultPlace = t.place
         deduct = t.deduct
         remind = t.remindMinutes
+        ownerBabyID = t.babyID
         for s in t.slots { slots[s.weekday] = s }
         // 旧数据：没有 slots 时，把默认值固化到每一天
         if t.slots.isEmpty {
@@ -221,7 +265,8 @@ struct TemplateEditorView: View {
             teacher: first?.teacher ?? defaultTeacher,
             deduct: deduct,
             remindMinutes: remind,
-            slots: all
+            slots: all,
+            babyID: effectiveOwner
         )
         if let old = template, let i = store.templates.firstIndex(where: { $0.id == old.id }) {
             var n = t; n.id = old.id

@@ -287,6 +287,11 @@ struct LedgerRow: View {
                 HStack(spacing: 4) {
                     Text(KBDate.mdhm.string(from: entry.date))
                         .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    if let who = entry.babyID, let b = store.baby(who),
+                       (store.course(entry.courseID)?.babyIDs.count ?? 0) > 1 {
+                        Text("· \(b.name)")
+                            .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.9))
+                    }
                     if entry.note.isEmpty {
                         Text("加备注")
                             .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))

@@ -89,6 +89,8 @@ struct MeView: View {
         calBusy = true
         let remain = Dictionary(store.courses.map { ($0.id, max(0, store.remaining($0))) }, uniquingKeysWith: { a, _ in a })
         CalendarSync.sync(templates: store.templates, courses: store.courses, remaining: remain,
+                          babyNames: Dictionary(store.babies.map { ($0.id, $0.name) },
+                                                uniquingKeysWith: { a, _ in a }),
                           skipHolidays: store.skipHolidays) { r in
             calBusy = false
             switch r {

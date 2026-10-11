@@ -21,7 +21,8 @@ struct Baby: Identifiable, Codable, Hashable {
 
 struct Course: Identifiable, Codable, Hashable {
     var id = UUID()
-    var babyID: UUID
+    /// 所属宝贝。年卡等「多个宝宝共用课时」场景可挂多个
+    var babyIDs: [UUID]
     var name: String
     var tag: String
     var total: Int
@@ -42,10 +43,10 @@ struct Course: Identifiable, Codable, Hashable {
         colorHex ?? KBPalette.forID(id)
     }
 
-    init(id: UUID = UUID(), babyID: UUID, name: String, tag: String, total: Int,
+    init(id: UUID = UUID(), babyIDs: [UUID], name: String, tag: String, total: Int,
          pricePerLesson: Double, expiry: Date, createdAt: Date = Date(),
          purchasedAt: Date? = nil, archived: Bool = false, colorHex: UInt32? = nil) {
-        self.id = id; self.babyID = babyID; self.name = name; self.tag = tag
+        self.id = id; self.babyIDs = babyIDs; self.name = name; self.tag = tag
         self.total = total; self.pricePerLesson = pricePerLesson; self.expiry = expiry
         self.createdAt = createdAt; self.purchasedAt = purchasedAt
         self.archived = archived; self.colorHex = colorHex
@@ -55,7 +56,14 @@ struct Course: Identifiable, Codable, Hashable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
-        babyID = try c.decode(UUID.self, forKey: .babyID)
+        // 旧数据是单个 babyID；新数据是数组。两种都要能读
+        if let arr = try c.decodeIfPresent([UUID].self, forKey: .babyIDs) {
+            babyIDs = arr
+        } else if let one = try c.decodeIfPresent(UUID.self, forKey: .babyID) {
+            babyIDs = [one]
+        } else {
+            babyIDs = []
+        }
         name = try c.decode(String.self, forKey: .name)
         tag = try c.decodeIfPresent(String.self, forKey: .tag) ?? ""
         total = try c.decode(Int.self, forKey: .total)
@@ -65,6 +73,28 @@ struct Course: Identifiable, Codable, Hashable {
         purchasedAt = try c.decodeIfPresent(Date.self, forKey: .purchasedAt)
         archived = try c.decodeIfPresent(Bool.self, forKey: .archived) ?? false
         colorHex = try c.decodeIfPresent(UInt32.self, forKey: .colorHex)
+    }
+
+    /// 显式 CodingKeys：保留旧的单值 `babyID` 只用于读旧快照
+    private enum CodingKeys: String, CodingKey {
+        case id, babyIDs, babyID, name, tag, total, pricePerLesson, expiry
+        case createdAt, purchasedAt, archived, colorHex
+    }
+
+    /// 只写新字段，不再输出单值 babyID
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(babyIDs, forKey: .babyIDs)
+        try c.encode(name, forKey: .name)
+        try c.encode(tag, forKey: .tag)
+        try c.encode(total, forKey: .total)
+        try c.encode(pricePerLesson, forKey: .pricePerLesson)
+        try c.encode(expiry, forKey: .expiry)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(purchasedAt, forKey: .purchasedAt)
+        try c.encode(archived, forKey: .archived)
+        try c.encodeIfPresent(colorHex, forKey: .colorHex)
     }
 }
 
@@ -104,6 +134,8 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
     var remindMinutes: Int       // 提前提醒分钟
     /// 每个星期几单独的时间／老师／地点。空则回退到上面的 hour/minute/teacher/place
     var slots: [DaySlot] = []
+    /// 共用课时（年卡）时，这一节课是哪个宝宝上的。nil = 用课程的默认归属
+    var babyID: UUID? = nil
 
     var timeText: String { String(format: "%02d:%02d", hour, minute) }
 
@@ -131,14 +163,16 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
         deduct = try c.decodeIfPresent(Int.self, forKey: .deduct) ?? 1
         remindMinutes = try c.decodeIfPresent(Int.self, forKey: .remindMinutes) ?? 30
         slots = try c.decodeIfPresent([DaySlot].self, forKey: .slots) ?? []
+        babyID = try c.decodeIfPresent(UUID.self, forKey: .babyID)
     }
 
     init(id: UUID = UUID(), courseID: UUID, weekdays: [Int], hour: Int, minute: Int,
          place: String, teacher: String, deduct: Int, remindMinutes: Int,
-         slots: [DaySlot] = []) {
+         slots: [DaySlot] = [], babyID: UUID? = nil) {
         self.id = id; self.courseID = courseID; self.weekdays = weekdays
         self.hour = hour; self.minute = minute; self.place = place; self.teacher = teacher
         self.deduct = deduct; self.remindMinutes = remindMinutes; self.slots = slots
+        self.babyID = babyID
     }
 }
 
@@ -168,13 +202,15 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var unitPrice: Double? = nil
     /// 充值前的课程单价：撤销这条充值时要还原，否则单价被永久改掉
     var prevPrice: Double? = nil
+    /// 共用课时（年卡）时，这条记录属于哪个宝宝
+    var babyID: UUID? = nil
 
     init(id: UUID = UUID(), courseID: UUID, date: Date, delta: Int,
          kind: RecordKind, note: String, summary: String? = nil, unitPrice: Double? = nil,
-         prevPrice: Double? = nil) {
+         prevPrice: Double? = nil, babyID: UUID? = nil) {
         self.id = id; self.courseID = courseID; self.date = date; self.delta = delta
         self.kind = kind; self.note = note; self.summary = summary; self.unitPrice = unitPrice
-        self.prevPrice = prevPrice
+        self.prevPrice = prevPrice; self.babyID = babyID
     }
 
     /// 手写解码：`summary` / `unitPrice` 在旧快照里不存在
@@ -189,6 +225,7 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
         summary = try c.decodeIfPresent(String.self, forKey: .summary)
         unitPrice = try c.decodeIfPresent(Double.self, forKey: .unitPrice)
         prevPrice = try c.decodeIfPresent(Double.self, forKey: .prevPrice)
+        babyID = try c.decodeIfPresent(UUID.self, forKey: .babyID)
     }
 }
 

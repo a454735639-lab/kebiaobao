@@ -16,7 +16,10 @@ struct RecordsView: View {
 
     private var scoped: [LedgerEntry] {
         let list = store.ledger.filter { e in
-            store.scope == nil || store.course(e.courseID)?.babyID == store.scope
+            guard let s = store.scope else { return true }
+            // 共用年卡的记录按归属人算；老记录没归属就退回课程成员判定
+            if let who = e.babyID { return who == s }
+            return store.course(e.courseID)?.babyIDs.contains(s) ?? false
         }
         return list.sorted { $0.date > $1.date }
     }

@@ -329,6 +329,12 @@ struct HomeView: View {
         }
     }
 
+    /// 共用年卡：这一节是哪个宝宝上的（单宝贝课程返回 nil，不显示徽章）
+    private func ownerName(_ t: LessonTemplate, _ c: Course) -> String? {
+        guard let id = t.babyID ?? c.babyIDs.first else { return nil }
+        return store.baby(id)?.name
+    }
+
     private func todayRow(_ t: LessonTemplate, date: Date) -> some View {
         let c = store.course(t.courseID)
         let s = t.slot(for: KBDate.cal.component(.weekday, from: date))
@@ -340,6 +346,14 @@ struct HomeView: View {
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(col)
                 Text(c?.name ?? "课程")
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                if let c, c.babyIDs.count > 1, let n = ownerName(t, c) {
+                    Text(n)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(KB.accent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(KB.accentSoft)
+                        .clipShape(Capsule())
+                }
                 Spacer()
                 Text("剩余 \(left) 节")
                     .font(.system(size: 12, weight: .medium))

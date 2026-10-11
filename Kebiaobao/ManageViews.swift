@@ -84,7 +84,7 @@ struct CourseManageView: View {
                                 .background(KB.accentSoft).clipShape(Capsule())
                         }
                     }
-                    Text("\(store.baby(c.babyID)?.name ?? "—") · 已上 \(used)/\(c.total) 节 · 剩余 \(c.total - used)")
+                    Text("\(store.babyNames(c.babyIDs)) · 已上 \(used)/\(c.total) 节 · 剩余 \(c.total - used)")
                         .font(.system(size: 11)).foregroundStyle(KB.dim)
                     Text("购买 \(KBDate.ymd.string(from: c.boughtAt)) · 到期 \(KBDate.ymd.string(from: c.expiry))")
                         .font(.system(size: 11)).foregroundStyle(KB.dim)

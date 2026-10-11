@@ -50,6 +50,7 @@ enum CalendarSync {
     static func sync(templates: [LessonTemplate],
                      courses: [Course],
                      remaining: [UUID: Int],
+                     babyNames: [UUID: String] = [:],
                      days: Int = 30,
                      skipHolidays: Bool = true,
                      completion: @escaping (Outcome) -> Void) {
@@ -89,7 +90,13 @@ enum CalendarSync {
                                                           second: 0, of: day) else { continue }
                         let ev = EKEvent(eventStore: store)
                         ev.calendar = cal
-                        ev.title = "\(c.name) · \(s.teacher.isEmpty ? "上课" : s.teacher)"
+                        // 共用年卡：日历标题带上归属宝宝，免得家长分不清哪节是哪个娃
+                        let who = t.babyID ?? c.babyIDs.first
+                        if let n = who.flatMap({ babyNames[$0] }), c.babyIDs.count > 1 {
+                            ev.title = "\(c.name) · \(n)"
+                        } else {
+                            ev.title = "\(c.name) · \(s.teacher.isEmpty ? "上课" : s.teacher)"
+                        }
                         ev.location = s.place
                         ev.startDate = begin
                         ev.endDate = begin.addingTimeInterval(60 * 60)   // 默认 1 小时

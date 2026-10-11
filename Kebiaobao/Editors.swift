@@ -95,7 +95,7 @@ struct CourseEditorView: View {
     @State private var price = ""
     @State private var expiry = Calendar.current.date(byAdding: .year, value: 1, to: Date())!
     @State private var purchased = Date()
-    @State private var babyID: UUID?
+    @State private var babyIDs: Set<UUID> = []
     @State private var advance = false
     @State private var advanceLessons = ""
     @State private var advancePrice = ""
@@ -152,18 +152,30 @@ struct CourseEditorView: View {
                                 FieldRow(label: "类别标签", text: $tag, placeholder: "如：音乐、运动、美术")
                                 Divider()
                                 if store.babies.count > 1 {
-                                    HStack {
-                                        Text("所属宝贝").font(.system(size: 15)).foregroundStyle(KB.text)
-                                        Spacer()
-                                        Picker("", selection: $babyID) {
-                                            ForEach(store.babies) { b in
-                                                Text(b.name).tag(Optional(b.id))
-                                            }
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("所属宝贝").font(.system(size: 15)).foregroundStyle(KB.text)
+                                            Spacer()
+                                            Text("可多选 · 共用课时")
+                                                .font(.system(size: 11)).foregroundStyle(KB.dim)
                                         }
-                                        .labelsHidden()
-                                        .tint(KB.accent)
+                                        ForEach(store.babies) { b in
+                                            Button {
+                                                if babyIDs.contains(b.id) { babyIDs.remove(b.id) }
+                                                else { babyIDs.insert(b.id) }
+                                            } label: {
+                                                HStack(spacing: 10) {
+                                                    Image(systemName: babyIDs.contains(b.id)
+                                                          ? "checkmark.circle.fill" : "circle")
+                                                        .foregroundStyle(babyIDs.contains(b.id) ? KB.accent : KB.dim)
+                                                    Text(b.name).font(.system(size: 15)).foregroundStyle(KB.text)
+                                                    Spacer()
+                                                }
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
                                     }
-                                    .padding(.vertical, 6)
+                                    .padding(.vertical, 8)
                                     Divider()
                                 }
                                 FieldRow(label: "总课时*", text: $total, placeholder: "12", keyboard: .numberPad)
@@ -229,7 +241,7 @@ struct CourseEditorView: View {
                     price = String(format: "%g", c.pricePerLesson)
                     expiry = c.expiry
                     purchased = c.boughtAt
-                    babyID = c.babyID
+                    babyIDs = Set(c.babyIDs)
                     colorHex = c.color
                 }
             }
@@ -240,19 +252,22 @@ struct CourseEditorView: View {
         let n = name.trimmingCharacters(in: .whitespaces)
         guard !n.isEmpty, let t = Int(total), t > 0 else { return }
         let p = Double(price) ?? 0
-        let babyID: UUID
-        if let chosen = self.babyID {
-            babyID = chosen
-        } else if let id = store.currentBabyID {
-            babyID = id
-        } else {
-            let b = Baby(name: "宝贝", birthday: nil)
-            store.babies.append(b)
-            store.currentBabyID = b.id
-            babyID = b.id
+        // 未勾选任何宝贝时回退当前宝贝；一个都没有就新建
+        var picked = Array(babyIDs)
+        if picked.isEmpty {
+            if let id = store.currentBabyID { picked = [id] }
+            else {
+                let b = Baby(name: "宝贝", birthday: nil)
+                store.babies.append(b)
+                store.currentBabyID = b.id
+                picked = [b.id]
+            }
         }
+        // 稳定顺序：按 babies 列表排，避免 Set 顺序抖动导致每次保存都改文件
+        let ordered = store.babies.map(\.id).filter { picked.contains($0) }
 
         if let c = course, let i = store.courses.firstIndex(where: { $0.id == c.id }) {
+            store.courses[i].babyIDs = ordered
             store.courses[i].name = n
             store.courses[i].tag = tag
             store.courses[i].total = t
@@ -262,16 +277,18 @@ struct CourseEditorView: View {
             store.courses[i].colorHex = colorHex
             if advance, let add = Int(advanceLessons), add > 0 {
                 let np = Double(advancePrice) ?? 0
-                store.charge(c.id, lessons: add, price: np, note: "续费")
+                store.charge(c.id, lessons: add, price: np, note: "续费",
+                             babyID: ordered.first)
             }
         } else {
-            let c = Course(babyID: babyID, name: n, tag: tag, total: t,
+            let c = Course(babyIDs: ordered, name: n, tag: tag, total: t,
                            pricePerLesson: p, expiry: KBDate.day(expiry),
                            purchasedAt: KBDate.day(purchased), colorHex: colorHex)
             store.courses.append(c)
             if t > 0 {
                 store.ledger.append(LedgerEntry(courseID: c.id, date: KBDate.day(purchased),
-                                                delta: t, kind: .charge, note: "初始购买"))
+                                                delta: t, kind: .charge, note: "初始购买",
+                                                babyID: ordered.first))
             }
         }
         store.save()

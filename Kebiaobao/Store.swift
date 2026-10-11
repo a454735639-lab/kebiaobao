@@ -26,7 +26,7 @@ final class Store: ObservableObject {
 
     private var statsDirty = true
     private var statCache: [UUID: (used: Int, spent: Double)] = [:]
-    /// 按月聚合的消课数：key = 年*100+月，value = 课程ID → 课时
+    /// 按月聚合的消课数：key = 年*100+月，value = 归属宝贝ID → 课时（共用年卡按归属人分账）
     private var monthStatCache: [Int: [UUID: Int]] = [:]
 
     private func stats() -> [UUID: (used: Int, spent: Double)] {
@@ -35,6 +35,9 @@ final class Store: ObservableObject {
             var byMonth: [Int: [UUID: Int]] = [:]
             let cal = KBDate.cal
             let price = Dictionary(courses.map { ($0.id, $0.pricePerLesson) }, uniquingKeysWith: { a, _ in a })
+            let firstBaby = Dictionary(courses.compactMap { c in
+                c.babyIDs.first.map { (c.id, $0) }
+            }, uniquingKeysWith: { a, _ in a })
             for e in ledger where e.delta < 0 {
                 let n = abs(e.delta)
                 let p = e.unitPrice ?? price[e.courseID] ?? 0
@@ -44,8 +47,9 @@ final class Store: ObservableObject {
                 m[e.courseID] = cur
                 // 同一趟遍历顺手按月分桶，供「本月」口径复用
                 let comps = cal.dateComponents([.year, .month], from: e.date)
-                if let y = comps.year, let mo = comps.month {
-                    byMonth[y * 100 + mo, default: [:]][e.courseID, default: 0] += n
+                if let y = comps.year, let mo = comps.month,
+                   let owner = e.babyID ?? firstBaby[e.courseID] {
+                    byMonth[y * 100 + mo, default: [:]][owner, default: 0] += n
                 }
             }
             statCache = m
@@ -173,6 +177,12 @@ final class Store: ObservableObject {
 
     func baby(_ id: UUID?) -> Baby? { babies.first { $0.id == id } }
 
+    /// 多个宝贝的名字拼串，用于共用年卡的列表显示
+    func babyNames(_ ids: [UUID]) -> String {
+        let s = ids.compactMap { baby($0)?.name }.joined(separator: "、")
+        return s.isEmpty ? "—" : s
+    }
+
     /// 按 id 取课程。走字典索引，不再是线性扫描
     func course(_ id: UUID) -> Course? {
         if indexDirty {
@@ -183,7 +193,7 @@ final class Store: ObservableObject {
     }
 
     func courses(for babyID: UUID?) -> [Course] {
-        courses.filter { (babyID == nil || $0.babyID == babyID) && !$0.archived }
+        courses.filter { (babyID == nil || $0.babyIDs.contains(babyID!)) && !$0.archived }
     }
 
     /// 当前筛选范围：开启「全部宝贝」时为 nil（= 全部）
@@ -214,15 +224,14 @@ final class Store: ObservableObject {
         ledger.filter { $0.courseID == courseID }.sorted { $0.date > $1.date }
     }
 
-    /// 本月已上课时（按扣课记录数）
+    /// 本月已上课时。传 babyID 则只算归属该宝宝的（共用年卡按归属人分账）
     func monthConsumed(_ babyID: UUID?) -> Int {
         _ = stats()  // 确保按月桶已建好
         let comps = KBDate.cal.dateComponents([.year, .month], from: Date())
         guard let y = comps.year, let mo = comps.month else { return 0 }
         guard let bucket = monthStatCache[y * 100 + mo] else { return 0 }
-        return bucket.reduce(0) { acc, kv in
-            babyID == nil || course(kv.key)?.babyID == babyID ? acc + kv.value : acc
-        }
+        if let babyID { return bucket[babyID] ?? 0 }
+        return bucket.values.reduce(0, +)
     }
 
     func remainingValue(_ courseID: UUID) -> Double {
@@ -244,7 +253,10 @@ final class Store: ObservableObject {
         return templates.filter { t in
             guard t.weekdays.contains(w), let c = course(t.courseID), !c.archived else { return false }
             guard d >= KBDate.day(c.boughtAt) else { return false }
-            return babyID == nil || c.babyID == babyID
+            guard let s = babyID else { return true }
+            // 排课指定了归属就用它；否则按课程成员判定（共用年卡两个宝宝都看得到）
+            if let owner = t.babyID { return owner == s }
+            return c.babyIDs.contains(s)
         }.sorted {
             let a = $0.slot(for: w), b = $1.slot(for: w)
             return (a.hour, a.minute) < (b.hour, b.minute)
@@ -263,33 +275,49 @@ final class Store: ObservableObject {
     // MARK: - 变更
 
     /// 打卡结果
-    enum CheckInResult { case ok, duplicate }
+    enum CheckInResult { case ok, duplicate, expired }
 
-    /// 打卡。同一天同一排课已有扣课记录时返回 .duplicate，不重复记账。
+    /// 课程是否已过期（按天比较，当天仍可上课）
+    func isExpired(_ courseID: UUID) -> Bool {
+        guard let c = course(courseID) else { return false }
+        return KBDate.day(Date()) > KBDate.day(c.expiry)
+    }
+
+    /// 这条排课的归属宝宝：模板指定优先，否则取课程的第一个宝贝
+    func owner(of template: LessonTemplate) -> UUID? {
+        template.babyID ?? course(template.courseID)?.babyIDs.first
+    }
+
+    /// 打卡。同一天同一排课（同一宝宝）已有扣课记录时返回 .duplicate，不重复记账。
     @discardableResult
     func checkIn(_ template: LessonTemplate, on date: Date) -> CheckInResult {
+        if isExpired(template.courseID) { return .expired }
         let day = KBDate.day(date)
+        let who = owner(of: template)
         let dup = ledger.contains {
             $0.courseID == template.courseID && $0.kind == .consume &&
+            $0.babyID == who &&
             KBDate.isSameDay($0.date, day)
         }
         if dup { return .duplicate }
         ledger.append(LedgerEntry(courseID: template.courseID, date: date,
                                   delta: -abs(template.deduct), kind: .consume,
                                   note: "正常上课",
-                                  unitPrice: course(template.courseID)?.pricePerLesson))
+                                  unitPrice: course(template.courseID)?.pricePerLesson,
+                                  babyID: who))
         save()
         return .ok
     }
 
-    func charge(_ courseID: UUID, lessons: Int, price: Double, note: String) {
+    func charge(_ courseID: UUID, lessons: Int, price: Double, note: String,
+                babyID: UUID? = nil) {
         guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
         let unit = price > 0 ? price : courses[i].pricePerLesson
         courses[i].total += lessons
         if price > 0 { courses[i].pricePerLesson = price }
         ledger.append(LedgerEntry(courseID: courseID, date: Date(),
                                   delta: lessons, kind: .charge, note: note,
-                                  unitPrice: unit))
+                                  unitPrice: unit, babyID: babyID))
         save()
     }
 
@@ -297,24 +325,27 @@ final class Store: ObservableObject {
     enum ManualOp: Hashable { case consume, leave, charge }
 
     func recordManual(_ op: ManualOp, courseID: UUID, lessons: Int, date: Date,
-                      note: String, price: Double) {
+                      note: String, price: Double, babyID: UUID? = nil) {
         let n = max(1, lessons)
         let memo = note.isEmpty ? Self.manualDefaultNote(op) : note
+        let who = babyID ?? course(courseID)?.babyIDs.first
         switch op {
         case .consume:
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: -n,
                                       kind: .consume, note: memo,
-                                      unitPrice: course(courseID)?.pricePerLesson))
+                                      unitPrice: course(courseID)?.pricePerLesson,
+                                      babyID: who))
         case .leave:
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: 0,
-                                      kind: .leave, note: memo))
+                                      kind: .leave, note: memo, babyID: who))
         case .charge:
             guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
             let unit = price > 0 ? price : courses[i].pricePerLesson
             courses[i].total += n
             if price > 0 { courses[i].pricePerLesson = price }
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: n,
-                                      kind: .charge, note: memo, unitPrice: unit))
+                                      kind: .charge, note: memo, unitPrice: unit,
+                                      babyID: who))
         }
         save()
     }
@@ -391,11 +422,18 @@ final class Store: ObservableObject {
     /// 删除宝贝，连同其课程、排课、流水（原来只删宝贝和课程，留下孤儿排课与流水）
     func deleteBaby(_ id: UUID) {
         backupNow()
-        let courseIDs = Set(courses.filter { $0.babyID == id }.map { $0.id })
         babies.removeAll { $0.id == id }
-        courses.removeAll { $0.babyID == id }
-        templates.removeAll { courseIDs.contains($0.courseID) }
-        ledger.removeAll { courseIDs.contains($0.courseID) }
+        // 共用年卡不能被一个宝宝带走：只摘除该宝贝；独享课程才整条删
+        for i in courses.indices {
+            courses[i].babyIDs.removeAll { $0 == id }
+        }
+        courses.removeAll { $0.babyIDs.isEmpty }
+        templates.removeAll { !courses.contains { c in c.id == $0.courseID } }
+        ledger.removeAll { !courses.contains { c in c.id == $0.courseID } }
+        // 归属该宝贝的流水改挂到课程剩余的第一个宝贝
+        for i in ledger.indices where ledger[i].babyID == id {
+            ledger[i].babyID = course(ledger[i].courseID)?.babyIDs.first
+        }
         if currentBabyID == id { currentBabyID = babies.first?.id }
         save()
     }
@@ -407,7 +445,7 @@ final class Store: ObservableObject {
         let cs: [Course]
         if let courseID { cs = courses.filter { $0.id == courseID } } else { cs = courses }
         let ids = Set(cs.map(\.id))
-        let bs = babies.filter { b in courseID == nil || cs.contains { $0.babyID == b.id } }
+        let bs = babies.filter { b in courseID == nil || cs.contains { $0.babyIDs.contains(b.id) } }
 
         var babyRows: [[String]] = [["ID", "姓名", "生日"]]
         for b in bs {
@@ -419,8 +457,10 @@ final class Store: ObservableObject {
                                        "总课时", "已用", "剩余", "单价", "总价", "购买时间", "到期日"]]
         for c in cs {
             let used = consumed(c.id)
-            courseRows.append([c.id.uuidString, c.babyID.uuidString,
-                               baby(c.babyID)?.name ?? "", c.name, c.tag,
+            courseRows.append([c.id.uuidString,
+                               c.babyIDs.map(\.uuidString).joined(separator: ","),
+                               c.babyIDs.compactMap { baby($0)?.name }.joined(separator: "、"),
+                               c.name, c.tag,
                                "\(c.total)", "\(used)", "\(c.total - used)",
                                String(format: "%g", c.pricePerLesson),
                                String(format: "%.2f", c.totalFee),
@@ -429,25 +469,26 @@ final class Store: ObservableObject {
         }
 
         var slotRows: [[String]] = [["排课ID", "课程ID", "课程", "星期", "时间",
-                                     "老师", "地点", "每次划扣", "提前提醒(分)"]]
+                                     "老师", "地点", "每次划扣", "提前提醒(分)", "归属宝贝ID"]]
         for t in templates where ids.contains(t.courseID) {
             for s in t.orderedSlots {
                 slotRows.append([t.id.uuidString, t.courseID.uuidString,
                                  course(t.courseID)?.name ?? "",
                                  s.dayName, s.timeText, s.teacher, s.place,
-                                 "\(t.deduct)", "\(t.remindMinutes)"])
+                                 "\(t.deduct)", "\(t.remindMinutes)",
+                                 t.babyID?.uuidString ?? ""])
             }
         }
 
         var entryRows: [[String]] = [["流水ID", "课程ID", "课程", "日期", "类型",
-                                      "课时", "单价", "备注", "课后小结"]]
+                                      "课时", "单价", "备注", "课后小结", "归属宝贝ID"]]
         for e in ledger.filter({ ids.contains($0.courseID) }).sorted(by: { $0.date < $1.date }) {
             entryRows.append([e.id.uuidString, e.courseID.uuidString,
                               course(e.courseID)?.name ?? "",
                               KBDate.mdhm.string(from: e.date), e.kind.label,
                               "\(e.delta)",
                               String(format: "%g", e.unitPrice ?? course(e.courseID)?.pricePerLesson ?? 0),
-                              e.note, e.summary ?? ""])
+                              e.note, e.summary ?? "", e.babyID?.uuidString ?? ""])
         }
 
         let name = cs.count == 1 ? cs[0].name : "全部课程"
@@ -527,8 +568,11 @@ final class Store: ObservableObject {
         for r in table(sheets, "课程", requiring: ["课程", "总课时"]) {
             let name = (r["课程"] ?? "").trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else { continue }
-            // 宝贝ID 必须能在宝贝表里找到，否则课程会挂到不可见的孤儿宝贝上
-            guard let bid = UUID(uuidString: r["宝贝ID"] ?? ""), babyIDs.contains(bid) else {
+            // 宝贝ID 可多个（逗号分隔，年卡共用课时）。至少要有一个能在宝贝表里找到
+            let bids = (r["宝贝ID"] ?? "").split(separator: ",")
+                .compactMap { UUID(uuidString: $0.trimmingCharacters(in: .whitespaces)) }
+                .filter { babyIDs.contains($0) }
+            guard !bids.isEmpty else {
                 throw NSError(domain: "kb", code: 5, userInfo: [NSLocalizedDescriptionKey:
                     "课程「\(name)」的宝贝ID 在「宝贝」表里找不到，导入会丢数据。请检查导出文件是否完整。"])
             }
@@ -538,7 +582,7 @@ final class Store: ObservableObject {
                     "课程「\(name)」的到期日「\(r["到期日"] ?? "")」无法识别（应为 2026-01-31 这样的格式）。"])
             }
             let c = Course(id: UUID(uuidString: r["ID"] ?? "") ?? UUID(),
-                           babyID: bid, name: name,
+                           babyIDs: bids, name: name,
                            tag: r["标签"] ?? "",
                            total: Int(r["总课时"] ?? "") ?? 0,
                            pricePerLesson: Double(r["单价"] ?? "") ?? 0,
@@ -583,7 +627,8 @@ final class Store: ObservableObject {
                 place: first?.place ?? "", teacher: first?.teacher ?? "",
                 deduct: Int(r["每次划扣"] ?? "") ?? 1,
                 remindMinutes: Int(r["提前提醒(分)"] ?? "") ?? 0,
-                slots: slots))
+                slots: slots,
+                babyID: UUID(uuidString: r["归属宝贝ID"] ?? "")))
         }
 
         let kinds: [String: RecordKind] = Dictionary(uniqueKeysWithValues:
@@ -606,7 +651,8 @@ final class Store: ObservableObject {
                 kind: kinds[r["类型"] ?? ""] ?? .consume,
                 note: r["备注"] ?? "",
                 summary: sum.isEmpty ? nil : sum,
-                unitPrice: Double(r["单价"] ?? "")))
+                unitPrice: Double(r["单价"] ?? ""),
+                babyID: UUID(uuidString: r["归属宝贝ID"] ?? "")))
         }
 
         guard !newCourses.isEmpty || !newBabies.isEmpty else {

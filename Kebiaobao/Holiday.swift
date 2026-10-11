@@ -78,6 +78,7 @@ enum Holiday {
     /// 是否法定放假日
     static func isHoliday(_ date: Date) -> Bool { resolved(date)?.holiday == true }
 
+
     /// 短标签，显示在日期下面：休 / 班 / 节名
     static func badge(_ date: Date) -> String? {
         guard let i = resolved(date) else { return nil }

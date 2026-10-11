@@ -364,6 +364,15 @@ struct ManualEntryEditorView: View {
     @State private var price = ""
     @State private var note = ""
     @State private var showPicker = false
+    /// 共用年卡：这条记录算在哪个宝宝头上
+    @State private var ownerBabyID: UUID?
+    @State private var expiredAlert = false
+
+    /// 已选课程挂在多个宝贝下时才需要选归属
+    private var ownerOptions: [Baby] {
+        guard let id = courseID, let c = store.course(id), c.babyIDs.count > 1 else { return [] }
+        return c.babyIDs.compactMap { store.baby($0) }
+    }
 
     var body: some View {
         NavigationStack {
@@ -397,6 +406,33 @@ struct ManualEntryEditorView: View {
                                 .padding(.vertical, 11)
                             }
                             .buttonStyle(.plain)
+                        }
+                        if !ownerOptions.isEmpty {
+                            Card {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text("记在谁头上").font(.system(size: 14)).foregroundStyle(KB.text)
+                                        Spacer()
+                                        Text("共用课时")
+                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                    }
+                                    HStack(spacing: 8) {
+                                        ForEach(ownerOptions) { b in
+                                            let on = (ownerBabyID ?? ownerOptions.first?.id) == b.id
+                                            Button { ownerBabyID = b.id } label: {
+                                                Text(b.name)
+                                                    .font(.system(size: 14, weight: .medium))
+                                                    .foregroundStyle(on ? KB.onAccent : KB.text)
+                                                    .frame(maxWidth: .infinity)
+                                                    .frame(height: 36)
+                                                    .background(on ? KB.accent : KB.bg)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                }
+                            }
                         }
                         Card {
                             HStack(alignment: .center) {
@@ -486,6 +522,11 @@ struct ManualEntryEditorView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .alert("课程已过期", isPresented: $expiredAlert) {
+                Button("好") { }
+            } message: {
+                Text("这门课的有效期已过，不能再扣课时。要续期请到课程编辑里改「有效期至」。")
+            }
             .sheet(isPresented: $showPicker) { coursePicker }
         }
     }
@@ -581,10 +622,15 @@ struct ManualEntryEditorView: View {
 
     private func save() {
         guard let id = courseID else { return }
+        // 到期课程禁止再扣课（与打卡同一规则）；请假/加课时不受限
+        if op == .consume && store.isExpired(id) { expiredAlert = true; return }
+        let opts = ownerOptions
+        let who = opts.isEmpty ? nil : (ownerBabyID.flatMap { p in opts.contains { $0.id == p } ? p : nil } ?? opts.first?.id)
         store.recordManual(op, courseID: id,
                            lessons: max(1, Int(lessonsText) ?? 1),
                            date: date,
-                           note: note, price: Double(price.replacingOccurrences(of: ",", with: ".")) ?? 0)
+                           note: note, price: Double(price.replacingOccurrences(of: ",", with: ".")) ?? 0,
+                           babyID: who)
         dismiss(); onDone()
     }
 }
@@ -598,7 +644,12 @@ struct CheckInSheet: View {
     @State private var deduct: Int = 1
     @State private var note = "正常上课"
     @State private var summary = ""
-    @State private var duplicate = false
+    @State private var alert: AlertKind?
+
+    private enum AlertKind: Identifiable {
+        case duplicate, expired
+        var id: Int { self == .duplicate ? 0 : 1 }
+    }
 
     var body: some View {
         NavigationStack {
@@ -646,12 +697,13 @@ struct CheckInSheet: View {
                     KBButton(title: "确认扣课 \(deduct) 课时", icon: "checkmark.circle.fill") {
                         var t = template
                         t.deduct = deduct
-                        guard store.checkIn(t, on: date) == .ok else {
-                            duplicate = true
-                            return
+                        switch store.checkIn(t, on: date) {
+                        case .ok:
+                            store.updateLastEntry(note: note, summary: summary)
+                            dismiss()
+                        case .duplicate: alert = .duplicate
+                        case .expired: alert = .expired
                         }
-                        store.updateLastEntry(note: note, summary: summary)
-                        dismiss()
                     }
                     Spacer()
                 }
@@ -664,10 +716,17 @@ struct CheckInSheet: View {
                     Button("取消") { dismiss() }
                 }
             }
-            .alert("今天已经打过卡", isPresented: $duplicate) {
-                Button("好") { dismiss() }
-            } message: {
-                Text("这门课今天已有扣课记录。如需调整，请到课时流水里撤销或改备注。")
+            .alert(item: $alert) { kind in
+                switch kind {
+                case .duplicate:
+                    return Alert(title: Text("今天已经打过卡"),
+                                 message: Text("这门课今天已有扣课记录。如需调整，请到课时流水里撤销或改备注。"),
+                                 dismissButton: .default(Text("好")) { dismiss() })
+                case .expired:
+                    return Alert(title: Text("课程已过期"),
+                                 message: Text("这门课的有效期已过，不能再扣课时。要续期请到课程编辑里改「有效期至」。"),
+                                 dismissButton: .default(Text("好")))
+                }
             }
         }
         .onAppear { deduct = max(1, template.deduct) }
