@@ -366,10 +366,11 @@ struct CourseEditorView: View {
                            purchasedAt: KBDate.day(purchased), colorHex: colorHex,
                            isPool: isPool, poolID: isPool ? nil : (noPool ? nil : poolID))
             store.courses.append(c)
-            if t > 0 {
+            // 挂在年卡上的课没有自己的课时，别记「初始购买」，否则课时凭空多一份
+            if t > 0 && c.poolID == nil {
                 store.ledger.append(LedgerEntry(courseID: c.id, date: KBDate.day(purchased),
                                                 delta: t, kind: .charge, note: "初始购买",
-                                                babyID: ordered.first))
+                                                unitPrice: p, babyID: ordered.first))
             }
         }
         store.save()
