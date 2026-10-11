@@ -46,5 +46,9 @@
 	<false/>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>用于上课前的排课提醒</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>把孩子的排课写入系统日历，方便在日历 App 里查看</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>把孩子的排课写入系统日历，方便在日历 App 里查看</string>
 </dict>
 </plist>

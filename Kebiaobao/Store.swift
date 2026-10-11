@@ -124,6 +124,15 @@ final class Store: ObservableObject {
 
     func remaining(_ course: Course) -> Int { course.total - consumed(course.id) }
 
+    /// 指定月份内的已消耗课时（month 为 nil 则统计全部）
+    func consumed(_ courseID: UUID, in month: Date?) -> Int {
+        ledger.filter { e in
+            guard e.courseID == courseID, e.delta < 0 else { return false }
+            guard let month else { return true }
+            return KBDate.cal.isDate(e.date, equalTo: month, toGranularity: .month)
+        }.reduce(0) { $0 + abs($1.delta) }
+    }
+
     func entries(_ courseID: UUID) -> [LedgerEntry] {
         ledger.filter { $0.courseID == courseID }.sorted { $0.date > $1.date }
     }

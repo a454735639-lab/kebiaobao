@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 import UserNotifications
+import EventKit
 
 struct MeView: View {
     @EnvironmentObject var store: Store
@@ -51,6 +52,57 @@ struct MeView: View {
         }
     }
 
+    // MARK: - 系统日历同步
+
+    @State private var calStatus: EKAuthorizationStatus = CalendarSync.status
+    @AppStorage("kb.calendarSync") private var calendarSync = false
+    @State private var calBusy = false
+
+    private var calSub: String {
+        if calBusy { return "同步中…" }
+        if !CalendarSync.isAuthorized {
+            return calStatus == .denied ? "未授权 · 点这里去系统设置开启"
+                                        : "点这里授权，把排课写入系统日历"
+        }
+        return calendarSync ? "已开启 · 排课自动写入「课时宝」日历" : "关闭中 · 点这里开启"
+    }
+
+    private func handleCalendarTap() {
+        if !CalendarSync.isAuthorized {
+            if calStatus == .denied, let u = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(u)
+            } else {
+                CalendarSync.requestAccess { ok in
+                    calStatus = CalendarSync.status
+                    if ok { calendarSync = true; syncCalendar() }
+                }
+            }
+            return
+        }
+        calendarSync.toggle()
+        if calendarSync { syncCalendar() } else { clearCalendar() }
+    }
+
+    private func syncCalendar() {
+        calBusy = true
+        CalendarSync.sync(templates: store.templates, courses: store.courses) { r in
+            calBusy = false
+            switch r {
+            case .ok(let n): toast = "已同步 \(n) 条排课到系统日历"
+            case .denied: calendarSync = false; toast = "未获得日历权限"
+            case .failed(let m): toast = "同步失败：\(m)"
+            }
+        }
+    }
+
+    private func clearCalendar() {
+        calBusy = true
+        CalendarSync.clear { r in
+            calBusy = false
+            if case .ok(let n) = r { toast = "已从系统日历移除 \(n) 条" }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -71,6 +123,8 @@ struct MeView: View {
                         group("提醒") {
                             row("bell.badge", "排课提醒",
                                 reminderSub) { handleReminderTap() }
+                            row("calendar.badge.plus", "同步到系统日历",
+                                calSub) { handleCalendarTap() }
                         }
                         group("外观") {
                             row("moon.stars", "深色模式",
@@ -257,14 +311,14 @@ struct MeView: View {
 
     private func navLedger() -> some View {
         NavigationLink {
-            LedgerListView(courseID: nil)
+            RecordsView()
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "list.bullet.rectangle")
                     .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("课时流水").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text("查看扣费／充值明细").font(.system(size: 11)).foregroundStyle(KB.dim)
+                    Text("记录").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
+                    Text("课时／缴费／打卡记录").font(.system(size: 11)).foregroundStyle(KB.dim)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")

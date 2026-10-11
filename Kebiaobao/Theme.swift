@@ -29,6 +29,32 @@ extension UIColor {
     }
 }
 
+extension Color {
+    init(hex: UInt32) {
+        self.init(red: Double((hex >> 16) & 0xFF) / 255,
+                  green: Double((hex >> 8) & 0xFF) / 255,
+                  blue: Double(hex & 0xFF) / 255)
+    }
+
+    /// 课程色：浅色模式下稍压暗以保证白底可读，深色模式下提亮
+    static func course(_ hex: UInt32) -> Color {
+        Color(UIColor { style in
+            let c = UIColor(hex: hex)
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            c.getRed(&r, green: &g, blue: &b, alpha: &a)
+            if style.userInterfaceStyle == .dark {
+                return UIColor(red: min(1, r * 1.12 + 0.06),
+                               green: min(1, g * 1.12 + 0.06),
+                               blue: min(1, b * 1.12 + 0.06), alpha: 1)
+            }
+            return UIColor(red: r * 0.92, green: g * 0.92, blue: b * 0.92, alpha: 1)
+        })
+    }
+
+    /// 课程色的浅底（用于 chip / 徽章背景）
+    static func courseSoft(_ hex: UInt32) -> Color { Color(hex: hex).opacity(0.16) }
+}
+
 /// 白色圆角卡片
 struct Card<Content: View>: View {
     var padding: CGFloat = 16

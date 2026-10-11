@@ -26,6 +26,7 @@ struct HomeView: View {
                     VStack(spacing: 14) {
                         header
                         statCard
+                        todayLessonsCard
                         upcomingCard
                         todayCard
                         Color.clear.frame(height: 80)
@@ -201,12 +202,14 @@ struct HomeView: View {
     private func lessonRow(_ t: LessonTemplate, date: Date) -> some View {
         let c = store.course(t.courseID)
         let s = t.slot(for: KBDate.cal.component(.weekday, from: date))
+        let col = Color.course(c?.color ?? KBPalette.colors[0])
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
+                Circle().fill(col).frame(width: 9, height: 9)
                 Text(c?.name ?? "课程")
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
                 Text(s.timeText)
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.accent)
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(col)
                 Spacer()
                 Text("剩余 \(c.map { store.remaining($0) } ?? 0) 节")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
@@ -267,32 +270,126 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - 今日课程
+
+    private var todayLessonsCard: some View {
+        let today = KBDate.day(Date())
+        let items = store.lessons(on: today, babyID: store.scope)
+        let lunar = Lunar.date(today)
+        let term = Lunar.term(today)
+        let badge = Holiday.badge(today)
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sun.max")
+                        .font(.system(size: 13)).foregroundStyle(KB.accent)
+                    Text("今日课程")
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    Spacer()
+                    if let badge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(hex: Holiday.isHoliday(today) ? 0xE06A6A : 0xC9A24D))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color(hex: Holiday.isHoliday(today) ? 0xE06A6A : 0xC9A24D).opacity(0.14))
+                            .clipShape(Capsule())
+                    }
+                    if let term {
+                        Text(term)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0x5F8FD0))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color(hex: 0x5F8FD0).opacity(0.14))
+                            .clipShape(Capsule())
+                    }
+                    if let lunar {
+                        Text("\(lunar.monthName)月\(lunar.dayName)")
+                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    }
+                }
+                if items.isEmpty {
+                    Text("今天没有课")
+                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 14)
+                } else {
+                    ForEach(items) { t in
+                        todayRow(t, date: today)
+                    }
+                }
+            }
+        }
+    }
+
+    private func todayRow(_ t: LessonTemplate, date: Date) -> some View {
+        let c = store.course(t.courseID)
+        let s = t.slot(for: KBDate.cal.component(.weekday, from: date))
+        let col = Color.course(c?.color ?? KBPalette.colors[0])
+        let left = c.map { store.remaining($0) } ?? 0
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text(s.timeText)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(col)
+                Text(c?.name ?? "课程")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                Spacer()
+                Text("剩余 \(left) 节")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(left <= 3 ? KB.warn : KB.dim)
+            }
+            HStack(spacing: 10) {
+                if !s.teacher.isEmpty {
+                    Label(s.teacher, systemImage: "person")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                }
+                if !s.place.isEmpty {
+                    Label(s.place, systemImage: "mappin.and.ellipse")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                }
+                Spacer()
+            }
+            HStack(spacing: 10) {
+                KBButton(title: "请假", filled: false, tint: KB.dim) {
+                    sheet = .manual(t, date, .leave)
+                }
+                KBButton(title: "打卡", icon: "checkmark.circle.fill", tint: col) {
+                    sheet = .checkIn(t, date)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.courseSoft(c?.color ?? KBPalette.colors[0]).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
     private func courseRow(_ c: Course) -> some View {
         let used = store.consumed(c.id)
         let left = c.total - used
+        let col = Color.course(c.color)
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
+                Circle().fill(col).frame(width: 9, height: 9)
                 Text(c.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
                 if !c.tag.isEmpty {
                     Text(c.tag)
                         .font(.system(size: 11))
-                        .foregroundStyle(KB.accent)
+                        .foregroundStyle(col)
                         .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(KB.accentSoft).clipShape(Capsule())
+                        .background(Color.courseSoft(c.color)).clipShape(Capsule())
                 }
                 Spacer()
                 Text("¥\(Int(c.pricePerLesson))/节")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
             KBProgress(value: used, total: c.total,
-                       color: left <= 3 ? KB.warn : KB.accent)
+                       color: left <= 3 ? KB.warn : col)
             HStack {
                 Text("已上 \(used) / \(c.total) 节")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
                 Spacer()
                 Text(left <= 0 ? "已完成" : "剩余 \(left) 节")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(left <= 0 ? KB.accent : (left <= 3 ? KB.warn : KB.text))
+                    .foregroundStyle(left <= 0 ? col : (left <= 3 ? KB.warn : KB.text))
             }
         }
         .padding(12)

@@ -102,6 +102,41 @@ struct CourseEditorView: View {
     @State private var advance = false
     @State private var advanceLessons = ""
     @State private var advancePrice = ""
+    @State private var colorHex: UInt32 = KBPalette.colors[0]
+
+    /// 颜色选择行：10 个色点 + 说明
+    private var colorRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("课程颜色").font(.system(size: 15)).foregroundStyle(KB.text)
+                Spacer()
+                Text("用于日历、进度图配色")
+                    .font(.system(size: 11)).foregroundStyle(KB.dim)
+            }
+            HStack(spacing: 10) {
+                ForEach(KBPalette.colors, id: \.self) { hex in
+                    Button {
+                        colorHex = hex
+                    } label: {
+                        Circle()
+                            .fill(Color.course(hex))
+                            .frame(width: 26, height: 26)
+                            .overlay(
+                                Circle().stroke(KB.text, lineWidth: colorHex == hex ? 2 : 0)
+                            )
+                            .overlay(
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .opacity(colorHex == hex ? 1 : 0)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+    }
 
     private var totalFee: Double {
         (Double(total) ?? 0) * (Double(price) ?? 0)
@@ -145,6 +180,8 @@ struct CourseEditorView: View {
                                 DatePicker("有效期至*", selection: $expiry, displayedComponents: .date)
                                     .font(.system(size: 15))
                                     .padding(.vertical, 8)
+                                Divider()
+                                colorRow
                             }
                             .padding(.horizontal, 16)
                         }
@@ -196,6 +233,7 @@ struct CourseEditorView: View {
                     expiry = c.expiry
                     purchased = c.boughtAt
                     babyID = c.babyID
+                    colorHex = c.color
                 }
             }
         }
@@ -224,6 +262,7 @@ struct CourseEditorView: View {
             store.courses[i].pricePerLesson = p
             store.courses[i].expiry = KBDate.day(expiry)
             store.courses[i].purchasedAt = KBDate.day(purchased)
+            store.courses[i].colorHex = colorHex
             if advance, let add = Int(advanceLessons), add > 0 {
                 let np = Double(advancePrice) ?? 0
                 store.charge(c.id, lessons: add, price: np, note: "续费")
@@ -231,7 +270,7 @@ struct CourseEditorView: View {
         } else {
             let c = Course(babyID: babyID, name: n, tag: tag, total: t,
                            pricePerLesson: p, expiry: KBDate.day(expiry),
-                           purchasedAt: KBDate.day(purchased))
+                           purchasedAt: KBDate.day(purchased), colorHex: colorHex)
             store.courses.append(c)
             if t > 0 {
                 store.ledger.append(LedgerEntry(courseID: c.id, date: KBDate.day(purchased),

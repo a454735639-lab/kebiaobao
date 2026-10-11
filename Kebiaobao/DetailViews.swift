@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 
 // MARK: - 课程详情
 
@@ -513,7 +514,12 @@ struct LedgerListView: View {
 struct AnalyticsView: View {
     @EnvironmentObject var store: Store
 
+    /// 统计范围：全部 / 本月
+    @State private var monthOnly = false
+
     private var list: [Course] { store.courses(for: store.scope) }
+
+    private var period: Date? { monthOnly ? Date() : nil }
 
     private var totalSpent: Double {
         list.reduce(0) { $0 + store.spent($1.id) }
@@ -525,6 +531,38 @@ struct AnalyticsView: View {
 
     private var totalRemainValue: Double {
         list.reduce(0) { $0 + store.remainingValue($1.id) }
+    }
+
+    /// 当期各课程消耗（用于环形图）
+    private var slices: [Slice] {
+        list.map { Slice(id: $0.id, name: $0.name, color: $0.color,
+                         value: store.consumed($0.id, in: period)) }
+            .filter { $0.value > 0 }
+            .sorted { $0.value > $1.value }
+    }
+
+    private var sliceTotal: Int { slices.reduce(0) { $0 + $1.value } }
+
+    /// 当期消课类型分布
+    private var kindSlices: [Slice] {
+        RecordKind.allCases.compactMap { k in
+            let v = store.ledger.filter { e in
+                guard e.kind == k, e.delta < 0 else { return false }
+                guard let p = period else { return true }
+                return KBDate.cal.isDate(e.date, equalTo: p, toGranularity: .month)
+            }.reduce(0) { $0 + abs($1.delta) }
+            guard v > 0 else { return nil }
+            return Slice(id: UUID(), name: k.label,
+                         color: k == .consume ? KBPalette.colors[0] : KBPalette.colors[2],
+                         value: v)
+        }
+    }
+
+    struct Slice: Identifiable {
+        let id: UUID
+        let name: String
+        let color: UInt32
+        let value: Int
     }
 
     var body: some View {
@@ -543,6 +581,65 @@ struct AnalyticsView: View {
                         }
                     }
 
+                    // 进度：全部 / 本月
+                    Picker("", selection: $monthOnly) {
+                        Text("全部").tag(false)
+                        Text(monthLabel).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 2)
+
+                    if !slices.isEmpty {
+                        Card {
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack {
+                                    Text("上课进度").font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(KB.text)
+                                    Spacer()
+                                    Text("共 \(sliceTotal) 节")
+                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                }
+                                DonutChart(slices: slices, total: sliceTotal)
+                                VStack(spacing: 8) {
+                                    ForEach(slices) { s in
+                                        HStack(spacing: 8) {
+                                            Circle().fill(Color.course(s.color))
+                                                .frame(width: 9, height: 9)
+                                            Text(s.name).font(.system(size: 13)).foregroundStyle(KB.text)
+                                            Spacer()
+                                            Text("\(s.value)节")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(KB.text)
+                                            Text(pct(s.value))
+                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .frame(width: 46, alignment: .trailing)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if !kindSlices.isEmpty {
+                        Card {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("消课类型").font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(KB.text)
+                                KindBar(slices: kindSlices)
+                                HStack(spacing: 14) {
+                                    ForEach(kindSlices) { s in
+                                        HStack(spacing: 5) {
+                                            Circle().fill(Color.course(s.color))
+                                                .frame(width: 8, height: 8)
+                                            Text("\(s.name) \(s.value)")
+                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Card {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("科目消耗统计").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
@@ -554,12 +651,14 @@ struct AnalyticsView: View {
                                     let sp = store.spent(c.id)
                                     VStack(alignment: .leading, spacing: 7) {
                                         HStack {
+                                            Circle().fill(Color.course(c.color))
+                                                .frame(width: 9, height: 9)
                                             Text(c.name).font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
                                             Spacer()
                                             Text("\(used)/\(c.total)节")
                                                 .font(.system(size: 12)).foregroundStyle(KB.dim)
                                         }
-                                        KBProgress(value: used, total: c.total)
+                                        KBProgress(value: used, total: c.total, color: Color.course(c.color))
                                         HStack {
                                             Text("已花费：¥\(String(format: "%.2f", sp))")
                                                 .font(.system(size: 12)).foregroundStyle(KB.dim)
@@ -608,5 +707,63 @@ struct AnalyticsView: View {
         }
         .navigationTitle("数据分析")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var monthLabel: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "MM月"
+        return f.string(from: Date())
+    }
+
+    private func pct(_ v: Int) -> String {
+        guard sliceTotal > 0 else { return "0%" }
+        return String(format: "%.0f%%", Double(v) / Double(sliceTotal) * 100)
+    }
+}
+
+/// 环形占比图（Swift Charts，iOS 17 SectorMark）
+struct DonutChart: View {
+    let slices: [AnalyticsView.Slice]
+    let total: Int
+
+    var body: some View {
+        ZStack {
+            Chart(slices) { s in
+                SectorMark(
+                    angle: .value("课时", s.value),
+                    innerRadius: .ratio(0.64),
+                    angularInset: 1.5
+                )
+                .cornerRadius(4)
+                .foregroundStyle(Color.course(s.color))
+            }
+            .frame(height: 180)
+            VStack(spacing: 2) {
+                Text("\(total)")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(KB.text)
+                Text("总课时").font(.system(size: 11)).foregroundStyle(KB.dim)
+            }
+        }
+    }
+}
+
+/// 横向堆叠条
+struct KindBar: View {
+    let slices: [AnalyticsView.Slice]
+
+    var body: some View {
+        GeometryReader { geo in
+            let sum = max(1, slices.reduce(0) { $0 + $1.value })
+            HStack(spacing: 2) {
+                ForEach(slices) { s in
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.course(s.color))
+                        .frame(width: max(3, geo.size.width * CGFloat(s.value) / CGFloat(sum)))
+                }
+            }
+        }
+        .frame(height: 12)
     }
 }

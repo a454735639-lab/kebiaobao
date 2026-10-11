@@ -248,27 +248,47 @@ struct ScheduleView: View {
             let isSel = KBDate.isSameDay(d, selected)
             let isToday = KBDate.isSameDay(d, Date())
             let wd = cal.component(.weekday, from: d)
+            let term = Lunar.term(d)
+            let lunar = Lunar.date(d)
             Button { selected = d } label: {
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text("\(cal.component(.day, from: d))")
                         .font(.system(size: 13, weight: isSel || isToday ? .semibold : .regular))
                         .foregroundStyle(isSel ? KB.onAccent : (isToday ? KB.accent : KB.text))
                         .frame(width: 24, height: 24)
                         .background(isSel ? KB.accent : Color.clear)
                         .clipShape(Circle())
+                    // 农历 / 节气 / 休班，优先级：节日/补班 > 节气 > 农历初一 > 农历日
+                    if let badge = Holiday.badge(d) {
+                        Text(badge)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Color(hex: Holiday.isHoliday(d) ? 0xE06A6A : 0xC9A24D))
+                            .lineLimit(1)
+                    } else if let term {
+                        Text(term)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Color(hex: 0x5F8FD0))
+                            .lineLimit(1)
+                    } else if let lunar {
+                        Text(lunar.day == 1 ? lunar.monthName + "月" : lunar.dayName)
+                            .font(.system(size: 8))
+                            .foregroundStyle(KB.dim)
+                            .lineLimit(1)
+                    }
                     ForEach(items.prefix(2)) { t in
                         let s = t.slot(for: wd)
+                        let c = store.course(t.courseID)
+                        let col = Color.course(c?.color ?? KBPalette.colors[0])
                         VStack(spacing: 0) {
                             Text(s.timeText).font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(KB.accent)
-                            Text(s.teacher.isEmpty ? (store.course(t.courseID)?.name ?? "")
-                                                   : s.teacher)
+                                .foregroundStyle(col)
+                            Text(s.teacher.isEmpty ? (c?.name ?? "") : s.teacher)
                                 .font(.system(size: 8)).foregroundStyle(KB.dim)
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal, 2).padding(.vertical, 1)
-                        .background(KB.accentSoft)
+                        .background(Color.courseSoft(c?.color ?? KBPalette.colors[0]))
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
                     if items.count > 2 {
@@ -276,14 +296,14 @@ struct ScheduleView: View {
                     }
                     Spacer(minLength: 0)
                 }
-                .frame(height: 62, alignment: .top)
+                .frame(height: 74, alignment: .top)
                 .frame(maxWidth: .infinity)
                 .background(isSel ? KB.accentSoft.opacity(0.5) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
         } else {
-            Color.clear.frame(height: 62)
+            Color.clear.frame(height: 74)
         }
     }
 
@@ -292,14 +312,15 @@ struct ScheduleView: View {
     private func row(_ t: LessonTemplate, on day: Date) -> some View {
         let c = store.course(t.courseID)
         let s = t.slot(for: KBDate.cal.component(.weekday, from: day))
+        let col = Color.course(c?.color ?? KBPalette.colors[0])
         return HStack(spacing: 12) {
             VStack(spacing: 2) {
                 Text(s.timeText)
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.accent)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(col)
                 Text("\(t.deduct)节").font(.system(size: 10)).foregroundStyle(KB.dim)
             }
             .frame(width: 52)
-            Rectangle().fill(KB.accent).frame(width: 3, height: 34)
+            Rectangle().fill(col).frame(width: 3, height: 34)
                 .clipShape(Capsule())
             VStack(alignment: .leading, spacing: 3) {
                 Text(c?.name ?? "课程")

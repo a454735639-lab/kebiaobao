@@ -38,9 +38,39 @@ struct Course: Identifiable, Codable, Hashable {
     /// 购买时间（旧数据回退到 createdAt）
     var purchasedAt: Date? = nil
     var archived: Bool = false
+    /// 课程专属色（hex，如 0x86C57C）。nil 时按 id 稳定分配调色板色
+    var colorHex: UInt32? = nil
 
     var totalFee: Double { Double(total) * pricePerLesson }
     var boughtAt: Date { purchasedAt ?? createdAt }
+
+    /// 稳定取色：显式 colorHex 优先，否则按 id 哈希落调色板
+    var color: UInt32 {
+        colorHex ?? KBPalette.forID(id)
+    }
+}
+
+/// 每科一色：柔和低饱和调色板（浅色底上可读，深色模式下也够亮）
+enum KBPalette {
+    static let colors: [UInt32] = [
+        0x86C57C,  // 草绿
+        0x8A5FAB,  // 紫
+        0xE08A5F,  // 橙
+        0x5F8FD0,  // 蓝
+        0xD06A8A,  // 玫红
+        0x5FB8B0,  // 青
+        0xC9A24D,  // 金
+        0x9A7BC8,  // 淡紫
+        0x6FA86F,  // 墨绿
+        0xC97B6A,  // 砖红
+    ]
+
+    /// 同 id 永远同色（UUID 前 8 字节哈希，跨启动稳定）
+    static func forID(_ id: UUID) -> UInt32 {
+        let b = id.uuid
+        let n = (UInt32(b.0) << 24) | (UInt32(b.1) << 16) | (UInt32(b.2) << 8) | UInt32(b.3)
+        return colors[Int(n % UInt32(colors.count))]
+    }
 }
 
 /// 排课模板：按星期重复
