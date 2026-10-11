@@ -210,13 +210,16 @@ final class Store: ObservableObject {
 
     /// 某天的课（展开排课模板），按当天的实际时间排序。
     /// 法定节假日（且未关闭该规则）返回空 —— 调休补班日照常上课。
+    /// 购买日之前不排课（旧数据 boughtAt 回退到 createdAt）。
     func lessons(on date: Date, babyID: UUID?) -> [LessonTemplate] {
         if isSkipped(date) { return [] }
         let w = KBDate.cal.component(.weekday, from: date)
+        let d = KBDate.day(date)
         // 先建索引：原来在 filter 里对每个模板各查一次 course(id)，是 O(模板 × 课程)
         let byID = Dictionary(courses.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         return templates.filter { t in
             guard t.weekdays.contains(w), let c = byID[t.courseID], !c.archived else { return false }
+            guard d >= KBDate.day(c.boughtAt) else { return false }
             return babyID == nil || c.babyID == babyID
         }.sorted {
             let a = $0.slot(for: w), b = $1.slot(for: w)

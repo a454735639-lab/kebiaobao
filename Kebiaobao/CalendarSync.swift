@@ -82,6 +82,8 @@ enum CalendarSync {
                     let wd = KBDate.cal.component(.weekday, from: day)
                     for t in templates where t.weekdays.contains(wd) {
                         guard let c = courseByID[t.courseID], !c.archived else { continue }
+                        // 购买日之前不写日历（和课表口径一致）
+                        guard day >= KBDate.day(c.boughtAt) else { continue }
                         let s = t.slot(for: wd)
                         guard let begin = KBDate.cal.date(bySettingHour: s.hour, minute: s.minute,
                                                           second: 0, of: day) else { continue }
