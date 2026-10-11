@@ -64,8 +64,11 @@ final class Store: ObservableObject {
         stats()[courseID] ?? (0, 0)
     }
     @Published var currentBabyID: UUID?
-    /// true = 显示全部宝贝的数据（currentBabyID 被忽略）
-    @Published var allBabies = false
+    /// 首页是否默认显示全部宝贝。存 UserDefaults（不进 Snapshot，避免旧数据解码失败）
+    @Published var allBabies: Bool =
+        UserDefaults.standard.object(forKey: "kb.allBabies") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(allBabies, forKey: "kb.allBabies") }
+    }
 
     /// 法定节假日不排课（默认开）。存 UserDefaults，不进 Snapshot，避免旧数据解码失败。
     @Published var skipHolidays: Bool =
@@ -165,7 +168,6 @@ final class Store: ObservableObject {
         templates = s.templates
         ledger = s.ledger
         currentBabyID = s.currentBabyID ?? s.babies.first?.id
-        if allBabies && babies.count <= 1 { allBabies = false }
         // 恢复/导入的数据是可信的，解除「解析失败停写盘」锁，否则恢复结果落不了盘
         loadFailed = false
         save()
