@@ -4,12 +4,20 @@ import SwiftUI
 final class Store: ObservableObject {
     @Published var babies: [Baby] = []
     @Published var courses: [Course] = [] {
-        didSet { statsDirty = true }
+        didSet { statsDirty = true; indexDirty = true }
     }
     @Published var templates: [LessonTemplate] = []
     @Published var ledger: [LedgerEntry] = [] {
         didSet { statsDirty = true }
     }
+
+    // MARK: - 课程索引
+    //
+    // course(id) 原来是 courses.first { … } 线性扫描，而全项目有 39 处调用，
+    // 且多处在 ForEach 的每一行里（月历 42 格、记录页每行）。这里建一份字典索引。
+
+    private var indexDirty = true
+    private var courseIndex: [UUID: Course] = [:]
 
     // MARK: - 统计缓存
     //
@@ -178,11 +186,11 @@ final class Store: ObservableObject {
 
     /// 指定月份内的已消耗课时（month 为 nil 则统计全部）
     func consumed(_ courseID: UUID, in month: Date?) -> Int {
-        ledger.filter { e in
-            guard e.courseID == courseID, e.delta < 0 else { return false }
-            guard let month else { return true }
-            return KBDate.cal.isDate(e.date, equalTo: month, toGranularity: .month)
-        }.reduce(0) { $0 + abs($1.delta) }
+        guard let month else { return stats()[courseID]?.used ?? 0 }
+        let comps = KBDate.cal.dateComponents([.year, .month], from: month)
+        guard let y = comps.year, let mo = comps.month else { return 0 }
+        _ = stats()  // 确保按月桶已建好
+        return monthStatCache[y * 100 + mo]?[courseID] ?? 0
     }
 
     func entries(_ courseID: UUID) -> [LedgerEntry] {
@@ -191,13 +199,13 @@ final class Store: ObservableObject {
 
     /// 本月已上课时（按扣课记录数）
     func monthConsumed(_ babyID: UUID?) -> Int {
-        let cal = KBDate.cal
-        let now = Date()
-        return ledger.filter { e in
-            e.delta < 0 && e.kind == .consume &&
-            cal.isDate(e.date, equalTo: now, toGranularity: .month) &&
-            (babyID == nil || course(e.courseID)?.babyID == babyID)
-        }.reduce(0) { $0 + abs($1.delta) }
+        _ = stats()  // 确保按月桶已建好
+        let comps = KBDate.cal.dateComponents([.year, .month], from: Date())
+        guard let y = comps.year, let mo = comps.month else { return 0 }
+        guard let bucket = monthStatCache[y * 100 + mo] else { return 0 }
+        return bucket.reduce(0) { acc, kv in
+            babyID == nil || course(kv.key)?.babyID == babyID ? acc + kv.value : acc
+        }
     }
 
     func remainingValue(_ courseID: UUID) -> Double {
@@ -215,10 +223,9 @@ final class Store: ObservableObject {
         if isSkipped(date) { return [] }
         let w = KBDate.cal.component(.weekday, from: date)
         let d = KBDate.day(date)
-        // 先建索引：原来在 filter 里对每个模板各查一次 course(id)，是 O(模板 × 课程)
-        let byID = Dictionary(courses.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        // course(_:) 走字典索引，不再是 O(课程数) 扫描
         return templates.filter { t in
-            guard t.weekdays.contains(w), let c = byID[t.courseID], !c.archived else { return false }
+            guard t.weekdays.contains(w), let c = course(t.courseID), !c.archived else { return false }
             guard d >= KBDate.day(c.boughtAt) else { return false }
             return babyID == nil || c.babyID == babyID
         }.sorted {

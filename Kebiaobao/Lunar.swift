@@ -74,8 +74,11 @@ enum Lunar {
         "白露","秋分","寒露","霜降","立冬","小雪","大雪","冬至"
     ]
 
-    /// 农历月序列：(月号 1-12, 是否闰月, 天数)
+    /// 农历月序列：(月号 1-12, 是否闰月, 天数)。每年结果固定，缓存避免重复构造数组。
+    private static var monthSeqCache: [Int: [(month: Int, leap: Bool, days: Int)]] = [:]
+
     private static func months(of year: Int) -> [(month: Int, leap: Bool, days: Int)] {
+        if let c = monthSeqCache[year] { return c }
         let code = yearCode[year - 1900]
         let leapMonth = code & 0xF          // 低 4 位 = 闰月月份，0 = 无闰
         let leapBig = (code >> 16) & 1      // 高 4 位最低位 = 闰月大小
@@ -88,12 +91,16 @@ enum Lunar {
                 out.append((i + 1, true, leapBig == 1 ? 30 : 29))
             }
         }
+        monthSeqCache[year] = out
         return out
     }
 
+    /// 复用同一个 Calendar：原来每次调用都新建一个（月历一屏 42 次）
+    private static let cal = Calendar(identifier: .gregorian)
+
     /// 公历 → 农历。返回 (月号, 日, 是否闰月, 月名, 日名)
     static func date(_ d: Date) -> (month: Int, day: Int, leap: Bool, monthName: String, dayName: String)? {
-        let comps = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: d)
+        let comps = cal.dateComponents([.year, .month, .day], from: d)
         guard let y = comps.year, let m = comps.month, let dd = comps.day else { return nil }
         return date(y, m, dd)
     }
@@ -158,7 +165,7 @@ enum Lunar {
 
     /// 当天节气名（无则 nil）
     static func term(_ date: Date) -> String? {
-        let comps = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: date)
+        let comps = cal.dateComponents([.year, .month, .day], from: date)
         guard let y = comps.year, let m = comps.month, let d = comps.day else { return nil }
         guard y >= 1900, y <= 2100 else { return nil }
         let start = (y - 1900) * 24
