@@ -126,6 +126,8 @@ struct MeView: View {
                                 reminderSub) { handleReminderTap() }
                             row("calendar.badge.plus", "同步到系统日历",
                                 calSub) { handleCalendarTap() }
+                            toggleRow("calendar.badge.exclamationmark", "法定节假日不排课",
+                                      "节假日当天不显示课、不写日历（排课提醒仍按星期）", isOn: $store.skipHolidays)
                         }
                         group("外观") {
                             row("moon.stars", "深色模式",
@@ -280,6 +282,23 @@ struct MeView: View {
             .padding(.horizontal, 16).padding(.vertical, 13)
         }
         .buttonStyle(.plain)
+    }
+
+    /// 带开关的行（用于「法定节假日不排课」这类规则）
+    private func toggleRow(_ icon: String, _ title: String, _ sub: String,
+                           isOn: Binding<Bool>) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15)).foregroundStyle(KB.accent)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
+                Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
+            }
+            Spacer()
+            Toggle("", isOn: isOn).labelsHidden().tint(KB.accent)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 13)
     }
 
     private func navBaby() -> some View {

@@ -154,10 +154,14 @@ struct ScheduleView: View {
                     Spacer()
                 }
                 if items.isEmpty {
-                    Text("暂无排课")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
+                    HStack(spacing: 6) {
+                        Image(systemName: store.isSkipped(d) ? "calendar.badge.exclamationmark" : "calendar")
+                            .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        Text(store.isSkipped(d) ? "法定节假日，不排课" : "暂无排课")
+                            .font(.system(size: 13)).foregroundStyle(KB.dim)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
                 } else {
                     ForEach(items) { t in row(t, on: d) }
                 }

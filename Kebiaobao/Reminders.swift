@@ -14,6 +14,9 @@ enum KBReminder {
     }
 
     /// 按当前排课重建全部提醒。无权限时静默失败。
+    /// 说明：按星期重复的通知无法跳过个别日期，且 iOS 对单个 App 的待发通知上限为 64 条，
+    /// 因此不能改成「未来 N 天逐日通知」来跳过节假日 —— 节假日当天的提醒仍会照常响。
+    /// 节假日的排课抑制在 Store.lessons(on:) 与 CalendarSync 里生效。
     static func sync(templates: [LessonTemplate], courses: [Course]) {
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in

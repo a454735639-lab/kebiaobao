@@ -37,14 +37,53 @@ enum Holiday {
 
     static func info(_ date: Date) -> Day? { table[key.string(from: date)] }
 
+    /// 数据未覆盖的年份用的保守回退：只算**节日当天**，不含国务院的调休安排。
+    /// 依据是固定公历日 + 农历节日（农历初一等），因此不会凭空多放假、也不会漏掉当天。
+    /// 数据补齐后（tools/update_holidays.py）此分支自动失效。
+    private static func fallbackInfo(_ date: Date) -> Day? {
+        let c = KBDate.cal.dateComponents([.year, .month, .day], from: date)
+        guard let y = c.year, let m = c.month, let d = c.day else { return nil }
+        guard !coveredYears.contains(y) else { return nil }
+
+        // 固定公历节日
+        switch (m, d) {
+        case (1, 1):  return Day(holiday: true, name: "元旦", target: "")
+        case (5, 1):  return Day(holiday: true, name: "劳动节", target: "")
+        case (10, 1), (10, 2), (10, 3):
+            return Day(holiday: true, name: "国庆节", target: "")
+        default: break
+        }
+        // 农历节日（当天）
+        if let l = Lunar.date(date) {
+            if l.month == 1 && !l.leap && (1...3).contains(l.day) {
+                return Day(holiday: true, name: "春节", target: "")
+            }
+            if l.month == 5 && !l.leap && l.day == 5 {
+                return Day(holiday: true, name: "端午节", target: "")
+            }
+            if l.month == 8 && !l.leap && l.day == 15 {
+                return Day(holiday: true, name: "中秋节", target: "")
+            }
+        }
+        // 清明（节气当天）
+        if Lunar.term(date) == "清明" {
+            return Day(holiday: true, name: "清明节", target: "")
+        }
+        return nil
+    }
+
+    private static func resolved(_ date: Date) -> Day? {
+        table[key.string(from: date)] ?? fallbackInfo(date)
+    }
+
     /// 是否法定放假日
-    static func isHoliday(_ date: Date) -> Bool { info(date)?.holiday == true }
+    static func isHoliday(_ date: Date) -> Bool { resolved(date)?.holiday == true }
     /// 是否调休补班日（周末上班）
-    static func isMakeup(_ date: Date) -> Bool { info(date)?.holiday == false }
+    static func isMakeup(_ date: Date) -> Bool { resolved(date)?.holiday == false }
 
     /// 短标签，显示在日期下面：休 / 班 / 节名
     static func badge(_ date: Date) -> String? {
-        guard let i = info(date) else { return nil }
+        guard let i = resolved(date) else { return nil }
         if i.holiday {
             // 「国庆节」→「国庆」；单字节日保留
             let n = i.name.replacingOccurrences(of: "节", with: "")
@@ -55,7 +94,7 @@ enum Holiday {
 
     /// 完整描述：「春节 放假」「春节后补班」
     static func label(_ date: Date) -> String? {
-        guard let i = info(date) else { return nil }
+        guard let i = resolved(date) else { return nil }
         return i.holiday ? "\(i.name) 放假" : i.name
     }
 }

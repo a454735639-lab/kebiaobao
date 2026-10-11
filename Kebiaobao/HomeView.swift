@@ -278,10 +278,11 @@ struct HomeView: View {
         let lunar = Lunar.date(today)
         let term = Lunar.term(today)
         let badge = Holiday.badge(today)
+        let skipped = store.isSkipped(today)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "sun.max")
+                    Image(systemName: skipped ? "calendar.badge.exclamationmark" : "sun.max")
                         .font(.system(size: 13)).foregroundStyle(KB.accent)
                     Text("今日课程")
                         .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
@@ -308,10 +309,14 @@ struct HomeView: View {
                     }
                 }
                 if items.isEmpty {
-                    Text("今天没有课")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 14)
+                    HStack(spacing: 6) {
+                        Image(systemName: store.isSkipped(today) ? "calendar.badge.exclamationmark" : "sun.max")
+                            .font(.system(size: 13)).foregroundStyle(KB.accent)
+                        Text(store.isSkipped(today) ? "法定节假日，不排课" : "今天没有课")
+                            .font(.system(size: 13)).foregroundStyle(KB.dim)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 14)
                 } else {
                     ForEach(items) { t in
                         todayRow(t, date: today)

@@ -10,6 +10,12 @@ final class Store: ObservableObject {
     /// true = 显示全部宝贝的数据（currentBabyID 被忽略）
     @Published var allBabies = false
 
+    /// 法定节假日不排课（默认开）。存 UserDefaults，不进 Snapshot，避免旧数据解码失败。
+    @Published var skipHolidays: Bool =
+        UserDefaults.standard.object(forKey: "kb.skipHolidays") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(skipHolidays, forKey: "kb.skipHolidays") }
+    }
+
     private var dir: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
@@ -153,8 +159,13 @@ final class Store: ObservableObject {
         return Double(remaining(c)) * c.pricePerLesson
     }
 
-    /// 某天的课（展开排课模板），按当天的实际时间排序
+    /// 该日期是否因法定节假日而不排课
+    func isSkipped(_ date: Date) -> Bool { skipHolidays && Holiday.isHoliday(date) }
+
+    /// 某天的课（展开排课模板），按当天的实际时间排序。
+    /// 法定节假日（且未关闭该规则）返回空 —— 调休补班日照常上课。
     func lessons(on date: Date, babyID: UUID?) -> [LessonTemplate] {
+        if isSkipped(date) { return [] }
         let w = KBDate.cal.component(.weekday, from: date)
         return templates.filter { t in
             t.weekdays.contains(w) &&
@@ -164,6 +175,17 @@ final class Store: ObservableObject {
             let a = $0.slot(for: w), b = $1.slot(for: w)
             return (a.hour, a.minute) < (b.hour, b.minute)
         }
+    }
+
+    /// 未来 N 天内的具体课次（跳过法定节假日），按时间升序
+    func upcomingOccurrences(days: Int, babyID: UUID?) -> [(date: Date, template: LessonTemplate)] {
+        let today = KBDate.day(Date())
+        var out: [(Date, LessonTemplate)] = []
+        for off in 0..<days {
+            guard let d = KBDate.cal.date(byAdding: .day, value: off, to: today) else { continue }
+            for t in lessons(on: d, babyID: babyID) { out.append((d, t)) }
+        }
+        return out
     }
 
     /// 未来 N 天内有课的日期集合
