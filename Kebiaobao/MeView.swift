@@ -14,6 +14,8 @@ struct MeView: View {
     @State private var shareItem: ShareItem?
     @State private var toast: String?
     @State private var pending: Store.ImportPreview?
+    /// 解析完暂存，等导入 sheet 关闭后交给确认页
+    @State private var stashed: Store.ImportPreview?
     @State private var confirmRestore = false
 
     private var backupSub: String {
