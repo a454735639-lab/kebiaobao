@@ -318,17 +318,15 @@ struct ScheduleView: View {
         let s = t.slot(for: KBDate.cal.component(.weekday, from: day))
         let col = Color.course(c?.color ?? KBPalette.colors[0])
         return HStack(spacing: 12) {
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 Text(s.timeText)
                     .font(.system(size: 13, weight: .semibold)).foregroundStyle(col)
                 Text("\(t.deduct)节").font(.system(size: 10)).foregroundStyle(KB.dim)
             }
             .frame(width: 52)
-            Rectangle().fill(col).frame(width: 3, height: 34)
-                .clipShape(Capsule())
             VStack(alignment: .leading, spacing: 3) {
                 Text(c?.name ?? "课程")
-                    .font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
                 Text([s.teacher, s.place].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
@@ -337,14 +335,20 @@ struct ScheduleView: View {
                 Text("打卡")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(KB.onAccent)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(KB.accent).clipShape(Capsule())
+                    .padding(.horizontal, 13).padding(.vertical, 6)
+                    .background(LinearGradient(colors: [col.opacity(0.86), col],
+                                               startPoint: .top, endPoint: .bottom))
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(10)
-        .background(KB.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(11)
+        .background(col.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(col).frame(width: 3.5)
+        }
     }
 }
 

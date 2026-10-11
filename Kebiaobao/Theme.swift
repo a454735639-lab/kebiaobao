@@ -18,6 +18,12 @@ enum KB {
     static let danger = dyn(0xE06A6A, 0xE88080)
     /// 强调色上的文字（两套主题下都用白字，accent 足够深）
     static let onAccent = Color.white
+
+    /// 强调色渐变（图标块 / 头像 / 主按钮）
+    static var accentGradient: LinearGradient {
+        LinearGradient(colors: [accent.opacity(0.82), accent],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 }
 
 extension UIColor {
@@ -57,6 +63,7 @@ extension Color {
 
 /// 白色圆角卡片
 struct Card<Content: View>: View {
+    @Environment(\.colorScheme) private var scheme
     var padding: CGFloat = 16
     var content: Content
 
@@ -70,11 +77,14 @@ struct Card<Content: View>: View {
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(KB.card)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(KB.line, lineWidth: 1)
             )
+            // 深色模式靠描边分层，浅色模式补一层极淡投影
+            .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.045),
+                    radius: 9, x: 0, y: 4)
     }
 }
 
@@ -120,7 +130,10 @@ struct KBButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .foregroundStyle(filled ? KB.onAccent : tint)
-            .background(filled ? tint : KB.card)
+            .background(filled
+                        ? AnyShapeStyle(LinearGradient(colors: [tint.opacity(0.86), tint],
+                                                       startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(KB.card))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -184,5 +197,75 @@ struct FieldRow: View {
                 .multilineTextAlignment(.trailing)
         }
         .padding(.vertical, 11)
+    }
+}
+
+// MARK: - 版式组件（v1.11.0）
+
+/// 卡片小节标题：图标块 + 标题 + 右侧附加内容
+struct SectionHeader<Trailing: View>: View {
+    let icon: String
+    let title: String
+    var tint: Color = KB.accent
+    @ViewBuilder var trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 8) {
+            IconBadge(icon: icon, tint: tint)
+            Text(title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(KB.text)
+            Spacer(minLength: 6)
+            trailing()
+        }
+    }
+}
+
+extension SectionHeader where Trailing == EmptyView {
+    init(icon: String, title: String, tint: Color = KB.accent) {
+        self.init(icon: icon, title: title, tint: tint) { EmptyView() }
+    }
+}
+
+/// 小圆角图标块
+struct IconBadge: View {
+    let icon: String
+    var tint: Color = KB.accent
+    var size: CGFloat = 24
+
+    var body: some View {
+        Image(systemName: icon)
+            .font(.system(size: size * 0.56, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
+            .background(tint.opacity(0.14))
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.32, style: .continuous))
+    }
+}
+
+/// 胶囊小标签（比裸 Text + background 少一层重复代码）
+struct KBChip: View {
+    let text: String
+    var tint: Color = KB.accent
+    var solid: Bool = false
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(solid ? KB.onAccent : tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(solid ? AnyShapeStyle(tint) : AnyShapeStyle(tint.opacity(0.14)))
+            .clipShape(Capsule())
+    }
+}
+
+/// 课程色竖条 + 内容（首页课程行左侧色带）
+struct ColorRail: View {
+    let color: Color
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(color)
+            .frame(width: 3.5)
     }
 }

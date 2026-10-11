@@ -248,10 +248,11 @@ struct MeView: View {
         Card {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().fill(KB.accentSoft).frame(width: 54, height: 54)
+                    Circle().fill(KB.accentGradient).frame(width: 54, height: 54)
                     Text(String(store.currentBaby?.name.prefix(1) ?? "宝"))
-                        .font(.system(size: 22, weight: .bold)).foregroundStyle(KB.accent)
+                        .font(.system(size: 22, weight: .bold)).foregroundStyle(KB.onAccent)
                 }
+                .shadow(color: KB.accent.opacity(0.28), radius: 7, x: 0, y: 4)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(store.currentBaby?.name ?? "宝贝")
                         .font(.system(size: 18, weight: .bold)).foregroundStyle(KB.text)
@@ -275,15 +276,34 @@ struct MeView: View {
     private var statCard: some View {
         let list = store.courses(for: store.scope)
         let remain = store.totalRemaining(babyID: store.scope)
-        return Card {
-            HStack(spacing: 0) {
-                StatTile(value: "\(list.count)", label: "总课程")
-                Divider().frame(height: 34)
-                StatTile(value: "\(store.monthConsumed(store.scope))", label: "本月课时")
-                Divider().frame(height: 34)
-                StatTile(value: "\(remain)", label: "剩余课时")
-            }
+        return HStack(spacing: 0) {
+            heroStat("\(list.count)", "总课程")
+            heroDivider
+            heroStat("\(store.monthConsumed(store.scope))", "本月课时")
+            heroDivider
+            heroStat("\(remain)", "剩余课时", warn: remain <= 3)
         }
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity)
+        .background(KB.accentGradient)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: KB.accent.opacity(0.30), radius: 12, x: 0, y: 6)
+    }
+
+    private func heroStat(_ value: String, _ label: String, warn: Bool = false) -> some View {
+        VStack(spacing: 5) {
+            Text(value)
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(warn ? Color(hex: 0xFFE7B0) : KB.onAccent)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(KB.onAccent.opacity(0.82))
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var heroDivider: some View {
+        Rectangle().fill(KB.onAccent.opacity(0.22)).frame(width: 1, height: 32)
     }
 
     @ViewBuilder
