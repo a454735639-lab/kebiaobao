@@ -25,8 +25,6 @@ enum KBAppearance: String, CaseIterable, Identifiable {
 struct KebiaobaoApp: App {
     @StateObject private var store = Store()
     @AppStorage("kb.appearance") private var appearance = KBAppearance.system.rawValue
-    /// 提醒重建的防抖句柄
-    @State private var resyncWork: DispatchWorkItem?
 
     var body: some Scene {
         WindowGroup {
@@ -48,6 +46,8 @@ struct RootView: View {
     @EnvironmentObject var store: Store
     @Environment(\.colorScheme) private var scheme
     @State private var tab = 0
+    /// 提醒重建的防抖句柄
+    @State private var resyncWork: DispatchWorkItem?
 
     var body: some View {
         TabView(selection: $tab) {
