@@ -85,7 +85,8 @@ struct MeView: View {
 
     private func syncCalendar() {
         calBusy = true
-        CalendarSync.sync(templates: store.templates, courses: store.courses) { r in
+        let remain = Dictionary(uniqueKeysWithValues: store.courses.map { ($0.id, max(0, store.remaining($0))) })
+        CalendarSync.sync(templates: store.templates, courses: store.courses, remaining: remain) { r in
             calBusy = false
             switch r {
             case .ok(let n): toast = "已同步 \(n) 条排课到系统日历"

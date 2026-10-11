@@ -49,6 +49,7 @@ enum CalendarSync {
     /// 把未来 `days` 天的排课写入系统日历。已存在的同名日历会被清空重建。
     static func sync(templates: [LessonTemplate],
                      courses: [Course],
+                     remaining: [UUID: Int],
                      days: Int = 30,
                      completion: @escaping (Outcome) -> Void) {
         guard isAuthorized else {
@@ -87,7 +88,7 @@ enum CalendarSync {
                         ev.location = s.place
                         ev.startDate = begin
                         ev.endDate = begin.addingTimeInterval(60 * 60)   // 默认 1 小时
-                        ev.notes = "课时宝排课 · 划扣 \(t.deduct) 课时 · 剩余 \(max(0, c.total - 0)) 课时"
+                        ev.notes = "课时宝排课 · 划扣 \(t.deduct) 课时 · 剩余 \(remaining[c.id] ?? 0) 课时"
                         if t.remindMinutes > 0 {
                             ev.addAlarm(EKAlarm(relativeOffset: -Double(t.remindMinutes) * 60))
                         }
