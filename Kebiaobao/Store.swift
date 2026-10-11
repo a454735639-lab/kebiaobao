@@ -428,8 +428,9 @@ final class Store: ObservableObject {
             courses[i].babyIDs.removeAll { $0 == id }
         }
         courses.removeAll { $0.babyIDs.isEmpty }
-        templates.removeAll { !courses.contains { c in c.id == $0.courseID } }
-        ledger.removeAll { !courses.contains { c in c.id == $0.courseID } }
+        let alive = Set(courses.map(\.id))
+        templates.removeAll { !alive.contains($0.courseID) }
+        ledger.removeAll { !alive.contains($0.courseID) }
         // 归属该宝贝的流水改挂到课程剩余的第一个宝贝
         for i in ledger.indices where ledger[i].babyID == id {
             ledger[i].babyID = course(ledger[i].courseID)?.babyIDs.first
