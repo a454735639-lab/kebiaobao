@@ -25,7 +25,11 @@ struct CourseDetailView: View {
                 VStack(spacing: 14) {
                     progressCard
                     infoCard
-                    templateCard
+                    if current.isPool {
+                        poolCoursesCard
+                    } else {
+                        templateCard
+                    }
                     ledgerCard
                     KBButton(title: "导出本课程 Excel", icon: "square.and.arrow.up",
                              filled: false) { exportCourse() }
@@ -80,18 +84,23 @@ struct CourseDetailView: View {
     }
 
     private var progressCard: some View {
-        let used = store.consumed(current.id)
-        let left = current.total - used
+        // 挂年卡的课：进度条走池子口径（多门课多宝宝共用一张卡）
+        let pool = store.pool(of: current.id) ?? current
+        let used = store.poolConsumed(pool.id)
+        let total = pool.total
+        let left = total - used
+        let shared = pool.id != current.id
         return Card {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text("课时进度").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    Text(shared ? "课时进度 · 共用「\(pool.name)」" : "课时进度")
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
                     Spacer()
-                    Text("\(used)/\(current.total) 节")
+                    Text("\(used)/\(total) 节")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(left <= 3 ? KB.warn : KB.accent)
                 }
-                KBProgress(value: used, total: current.total,
+                KBProgress(value: used, total: total,
                            color: left <= 0 ? KB.accent : (left <= 3 ? KB.warn : KB.accent))
                 HStack {
                     Text("剩余 \(max(0, left)) 节")
@@ -100,11 +109,45 @@ struct CourseDetailView: View {
                     Text("剩余价值 ¥\(String(format: "%.2f", store.remainingValue(current.id)))")
                         .font(.system(size: 13)).foregroundStyle(KB.dim)
                 }
+                if shared {
+                    Text("本课已上 \(store.consumed(current.id)) 节 · 池内共 \(store.courses.filter { $0.poolID == pool.id && !$0.archived }.count) 门课共用")
+                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                }
                 HStack(spacing: 10) {
                     KBButton(title: "续费", filled: false) { renew = true }
-                    KBButton(title: "加排课", icon: "calendar.badge.plus") { addTemplate = true }
+                    if !current.isPool {
+                        KBButton(title: "加排课", icon: "calendar.badge.plus") { addTemplate = true }
+                    }
                 }
             }
+        }
+    }
+
+    /// 年卡详情：列出挂在它下面的课程
+    private var poolCoursesCard: some View {
+        let attached = store.courses.filter { $0.poolID == current.id && !$0.archived }
+        return Card {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("共用这张年卡的课程").font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(KB.text)
+                if attached.isEmpty {
+                    Text("还没课程挂在它下面。去「课程管理」把课程的「课时从哪扣」选到这张卡。")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                } else {
+                    ForEach(attached) { c in
+                        HStack {
+                            Circle().fill(Color.course(c.color)).frame(width: 8, height: 8)
+                            Text(c.name).font(.system(size: 14)).foregroundStyle(KB.text)
+                            Spacer()
+                            Text("\(store.babyNames(c.babyIDs)) · 本课已上 \(store.consumed(c.id)) 节")
+                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        }
+                    }
+                }
+                Text("年卡不排课，只放总课时和有效期")
+                    .font(.system(size: 11)).foregroundStyle(KB.dim)
+            }
+            .padding(.horizontal, 16)
         }
     }
 
@@ -535,7 +578,15 @@ struct AnalyticsView: View {
     }
 
     private var totalRemainValue: Double {
-        list.reduce(0) { $0 + store.remainingValue($1.id) }
+        // 共用年卡的课只算一次，否则同一张卡按课数重复计入
+        var seen = Set<UUID>()
+        var sum = 0.0
+        for c in list {
+            let pid = c.poolID ?? c.id
+            guard seen.insert(pid).inserted else { continue }
+            sum += store.remainingValue(c.id)
+        }
+        return sum
     }
 
     /// 当期各课程消耗（用于环形图）
@@ -655,16 +706,21 @@ struct AnalyticsView: View {
                             } else {
                                 ForEach(list) { c in
                                     let (used, sp) = store.usedAndSpent(c.id)
+                                    let pid = c.poolID
+                                    let pTotal = store.pool(of: c.id)?.total ?? c.total
+                                    let pUsed = pid == nil ? used : store.poolConsumed(pid!)
                                     VStack(alignment: .leading, spacing: 7) {
                                         HStack {
                                             Circle().fill(Color.course(c.color))
                                                 .frame(width: 9, height: 9)
                                             Text(c.name).font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
                                             Spacer()
-                                            Text("\(used)/\(c.total)节")
+                                            Text(pid == nil ? "\(used)/\(pTotal)节"
+                                                 : "本课 \(used) 节 · 池 \(pUsed)/\(pTotal)节")
                                                 .font(.system(size: 12)).foregroundStyle(KB.dim)
                                         }
-                                        KBProgress(value: used, total: c.total, color: Color.course(c.color))
+                                        KBProgress(value: pUsed, total: pTotal,
+                                                   color: Color.course(c.color))
                                         HStack {
                                             Text("已花费：¥\(String(format: "%.2f", sp))")
                                                 .font(.system(size: 12)).foregroundStyle(KB.dim)

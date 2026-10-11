@@ -193,7 +193,25 @@ final class Store: ObservableObject {
     }
 
     func courses(for babyID: UUID?) -> [Course] {
-        courses.filter { (babyID == nil || $0.babyIDs.contains(babyID!)) && !$0.archived }
+        courses.filter { (babyID == nil || $0.babyIDs.contains(babyID!)) && !$0.archived && !$0.isPool }
+    }
+
+    /// 课时池（年卡）：本身不排课，供多门课多宝宝共用课时
+    func pools(for babyID: UUID?) -> [Course] {
+        courses.filter { (babyID == nil || $0.babyIDs.contains(babyID!)) && !$0.archived && $0.isPool }
+    }
+
+    /// 这门课从哪个池扣课时：有 poolID 就指向年卡，否则自己就是一个池
+    func pool(of courseID: UUID) -> Course? {
+        guard let c = course(courseID) else { return nil }
+        if let pid = c.poolID { return course(pid) ?? c }
+        return c
+    }
+
+    /// 池子内所有课程的已消耗合计（含池卡自身）
+    func poolConsumed(_ poolID: UUID) -> Int {
+        courses.filter { $0.id == poolID || $0.poolID == poolID }
+            .reduce(0) { $0 + consumed($1.id) }
     }
 
     /// 当前筛选范围：开启「全部宝贝」时为 nil（= 全部）
@@ -209,7 +227,19 @@ final class Store: ObservableObject {
     /// 已花费金额：优先用记账当时的单价，旧数据回退课程当前单价
     func spent(_ courseID: UUID) -> Double { stats()[courseID]?.spent ?? 0 }
 
-    func remaining(_ course: Course) -> Int { course.total - consumed(course.id) }
+    func remaining(_ course: Course) -> Int {
+        // 挂在年卡上的课，剩余看池子总余额（多个宝宝/多门课共用一个池）
+        if let pid = course.poolID, let p = self.course(pid) {
+            return p.total - poolConsumed(pid)
+        }
+        return course.total - consumed(course.id)
+    }
+
+    /// 池子总余额
+    func poolRemaining(_ poolID: UUID) -> Int {
+        guard let p = course(poolID) else { return 0 }
+        return p.total - poolConsumed(poolID)
+    }
 
     /// 指定月份内的已消耗课时（month 为 nil 则统计全部）
     func consumed(_ courseID: UUID, in month: Date?) -> Int {
@@ -234,9 +264,22 @@ final class Store: ObservableObject {
         return bucket.values.reduce(0, +)
     }
 
+    /// 剩余课时合计（按池去重：多门课共用一张年卡只算一次）
+    func totalRemaining(babyID: UUID?) -> Int {
+        var seen = Set<UUID>()
+        var sum = 0
+        for c in courses(for: babyID) {
+            guard seen.insert(c.poolID ?? c.id).inserted else { continue }
+            sum += remaining(c)
+        }
+        return sum
+    }
+
     func remainingValue(_ courseID: UUID) -> Double {
         guard let c = course(courseID) else { return 0 }
-        return Double(remaining(c)) * c.pricePerLesson
+        // 挂年卡的课按池子的单价折算剩余价值
+        let price = pool(of: courseID)?.pricePerLesson ?? c.pricePerLesson
+        return Double(remaining(c)) * price
     }
 
     /// 该日期是否因法定节假日而不排课
@@ -279,7 +322,8 @@ final class Store: ObservableObject {
 
     /// 课程是否已过期（按天比较，当天仍可上课）
     func isExpired(_ courseID: UUID) -> Bool {
-        guard let c = course(courseID) else { return false }
+        // 挂年卡的课按池子的有效期判（一张卡一个到期日）
+        guard let c = pool(of: courseID) ?? course(courseID) else { return false }
         return KBDate.day(Date()) > KBDate.day(c.expiry)
     }
 
@@ -303,19 +347,22 @@ final class Store: ObservableObject {
         ledger.append(LedgerEntry(courseID: template.courseID, date: date,
                                   delta: -abs(template.deduct), kind: .consume,
                                   note: "正常上课",
-                                  unitPrice: course(template.courseID)?.pricePerLesson,
+                                  unitPrice: pool(of: template.courseID)?.pricePerLesson
+                                             ?? course(template.courseID)?.pricePerLesson,
                                   babyID: who))
         save()
         return .ok
     }
 
+    /// 加课时。挂在年卡上的课，课时加到池子上（一张卡共享）
     func charge(_ courseID: UUID, lessons: Int, price: Double, note: String,
                 babyID: UUID? = nil) {
-        guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+        let target = course(courseID)?.poolID ?? courseID
+        guard let i = courses.firstIndex(where: { $0.id == target }) else { return }
         let unit = price > 0 ? price : courses[i].pricePerLesson
         courses[i].total += lessons
         if price > 0 { courses[i].pricePerLesson = price }
-        ledger.append(LedgerEntry(courseID: courseID, date: Date(),
+        ledger.append(LedgerEntry(courseID: target, date: Date(),
                                   delta: lessons, kind: .charge, note: note,
                                   unitPrice: unit, babyID: babyID))
         save()
@@ -339,11 +386,13 @@ final class Store: ObservableObject {
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: 0,
                                       kind: .leave, note: memo, babyID: who))
         case .charge:
-            guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
+            // 课时加到池子上（挂年卡的课共享一张卡）
+            let target = course(courseID)?.poolID ?? courseID
+            guard let i = courses.firstIndex(where: { $0.id == target }) else { return }
             let unit = price > 0 ? price : courses[i].pricePerLesson
             courses[i].total += n
             if price > 0 { courses[i].pricePerLesson = price }
-            ledger.append(LedgerEntry(courseID: courseID, date: date, delta: n,
+            ledger.append(LedgerEntry(courseID: target, date: date, delta: n,
                                       kind: .charge, note: memo, unitPrice: unit,
                                       babyID: who))
         }
@@ -413,6 +462,10 @@ final class Store: ObservableObject {
 
     func deleteCourse(_ id: UUID) {
         backupNow()
+        // 删的是年卡：挂在它下面的课改为自成一池，不跟着消失
+        for i in courses.indices where courses[i].poolID == id {
+            courses[i].poolID = nil
+        }
         courses.removeAll { $0.id == id }
         templates.removeAll { $0.courseID == id }
         ledger.removeAll { $0.courseID == id }
@@ -427,7 +480,12 @@ final class Store: ObservableObject {
         for i in courses.indices {
             courses[i].babyIDs.removeAll { $0 == id }
         }
+        let dropped = Set(courses.filter { $0.babyIDs.isEmpty }.map(\.id))
         courses.removeAll { $0.babyIDs.isEmpty }
+        // 池卡被删时，挂在它下面的课改为自成一池
+        for i in courses.indices where courses[i].poolID.map({ dropped.contains($0) }) == true {
+            courses[i].poolID = nil
+        }
         let alive = Set(courses.map(\.id))
         templates.removeAll { !alive.contains($0.courseID) }
         ledger.removeAll { !alive.contains($0.courseID) }
@@ -444,7 +502,9 @@ final class Store: ObservableObject {
     /// 单课程导出：只含该课程及其排课、流水、所属宝贝
     func exportXLSX(courseID: UUID? = nil) -> Data {
         let cs: [Course]
-        if let courseID { cs = courses.filter { $0.id == courseID } } else { cs = courses }
+        if let courseID {
+            cs = courses.filter { $0.id == courseID || $0.id == course(courseID)?.poolID }
+        } else { cs = courses }
         let ids = Set(cs.map(\.id))
         let bs = babies.filter { b in courseID == nil || cs.contains { $0.babyIDs.contains(b.id) } }
 
@@ -455,9 +515,10 @@ final class Store: ObservableObject {
         }
 
         var courseRows: [[String]] = [["ID", "宝贝ID", "宝贝", "课程", "标签",
-                                       "总课时", "已用", "剩余", "单价", "总价", "购买时间", "到期日"]]
+                                       "总课时", "已用", "剩余", "单价", "总价", "购买时间", "到期日",
+                                       "年卡", "年卡ID"]]
         for c in cs {
-            let used = consumed(c.id)
+            let used = c.isPool ? poolConsumed(c.id) : consumed(c.id)
             courseRows.append([c.id.uuidString,
                                c.babyIDs.map(\.uuidString).joined(separator: ","),
                                c.babyIDs.compactMap { baby($0)?.name }.joined(separator: "、"),
@@ -466,7 +527,9 @@ final class Store: ObservableObject {
                                String(format: "%g", c.pricePerLesson),
                                String(format: "%.2f", c.totalFee),
                                KBDate.ymd.string(from: c.boughtAt),
-                               KBDate.ymd.string(from: c.expiry)])
+                               KBDate.ymd.string(from: c.expiry),
+                               c.isPool ? "是" : "",
+                               c.poolID?.uuidString ?? ""])
         }
 
         var slotRows: [[String]] = [["排课ID", "课程ID", "课程", "星期", "时间",
@@ -588,7 +651,9 @@ final class Store: ObservableObject {
                            total: Int(r["总课时"] ?? "") ?? 0,
                            pricePerLesson: Double(r["单价"] ?? "") ?? 0,
                            expiry: exp,
-                           purchasedAt: KBDate.ymd.date(from: r["购买时间"] ?? ""))
+                           purchasedAt: KBDate.ymd.date(from: r["购买时间"] ?? ""),
+                           isPool: (r["年卡"] ?? "") == "是",
+                           poolID: UUID(uuidString: r["年卡ID"] ?? ""))
             newCourses.append(c)
         }
         let courseIDs = Set(newCourses.map(\.id))

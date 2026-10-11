@@ -7,8 +7,36 @@ struct CourseManageView: View {
     @State private var editing: Course?
     @State private var adding = false
     @State private var showArchived = false
+    @State private var showPools = false
 
     private var archived: [Course] { store.archivedCourses() }
+    private var pools: [Course] { store.courses.filter { !$0.archived && $0.isPool } }
+
+    private func poolRow(_ p: Course) -> some View {
+        let left = store.poolRemaining(p.id)
+        let attached = store.courses.filter { $0.poolID == p.id && !$0.archived }
+        return Card {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                        Text("年卡")
+                            .font(.system(size: 10, weight: .medium)).foregroundStyle(.white)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(KB.accent).clipShape(Capsule())
+                    }
+                    Text("\(store.babyNames(p.babyIDs)) · 共 \(p.total) 节 · 池内剩 \(left) 节")
+                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    Text(attached.isEmpty ? "还没挂课程"
+                         : "已挂 \(attached.count) 门课：\(attached.map(\.name).joined(separator: "、"))")
+                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(KB.dim)
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -20,11 +48,30 @@ struct CourseManageView: View {
                             .font(.system(size: 13)).foregroundStyle(KB.dim)
                             .padding(.vertical, 24)
                     }
-                    ForEach(store.courses.filter { !$0.archived }) { c in
+                    ForEach(store.courses.filter { !$0.archived && !$0.isPool }) { c in
                         Button { editing = c } label: { row(c) }
                             .buttonStyle(.plain)
                     }
                     KBButton(title: "新增课程", icon: "plus") { adding = true }
+
+                    // 年卡（课时池）：一张卡供多门课多宝宝共用
+                    if !pools.isEmpty {
+                        HStack {
+                            Text("年卡 · 课时池（\(pools.count)）")
+                                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                            Spacer()
+                            Button(showPools ? "收起" : "展开") { showPools.toggle() }
+                                .font(.system(size: 12)).foregroundStyle(KB.accent)
+                                .buttonStyle(.plain)
+                        }
+                        .padding(.top, 8)
+                        if showPools {
+                            ForEach(pools) { p in
+                                Button { editing = p } label: { poolRow(p) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                    }
 
                     if !archived.isEmpty {
                         HStack {
@@ -72,6 +119,9 @@ struct CourseManageView: View {
 
     private func row(_ c: Course) -> some View {
         let used = store.consumed(c.id)
+        // 挂年卡的课：显示池子余额，而不是本课已上数
+        let left = store.remaining(c)
+        let poolName = c.poolID.flatMap { store.course($0)?.name }
         return Card {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -84,8 +134,13 @@ struct CourseManageView: View {
                                 .background(KB.accentSoft).clipShape(Capsule())
                         }
                     }
-                    Text("\(store.babyNames(c.babyIDs)) · 已上 \(used)/\(c.total) 节 · 剩余 \(c.total - used)")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    if let pn = poolName {
+                        Text("\(store.babyNames(c.babyIDs)) · 共用「\(pn)」 · 池内剩 \(left) 节")
+                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    } else {
+                        Text("\(store.babyNames(c.babyIDs)) · 已上 \(used)/\(c.total) 节 · 剩余 \(left)")
+                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    }
                     Text("购买 \(KBDate.ymd.string(from: c.boughtAt)) · 到期 \(KBDate.ymd.string(from: c.expiry))")
                         .font(.system(size: 11)).foregroundStyle(KB.dim)
                 }

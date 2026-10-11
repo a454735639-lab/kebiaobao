@@ -100,8 +100,29 @@ struct CourseEditorView: View {
     @State private var advanceLessons = ""
     @State private var advancePrice = ""
     @State private var colorHex: UInt32 = KBPalette.colors[0]
+    /// 年卡（课时池）编辑模式
+    @State private var isPool = false
+    /// 这门课从哪张年卡扣课时。nil = 自己管自己的课时
+    @State private var poolID: UUID?
+    @State private var noPool = true
+
+    /// 可选的年卡列表（不含自己）
+    private var poolOptions: [Course] {
+        store.courses.filter { $0.isPool && !$0.archived && $0.id != course?.id }
+    }
 
     /// 颜色选择行：10 个色点 + 说明
+    /// 单选行（年卡选择用）
+    private func pickRow(title: String, on: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(on ? KB.accent : KB.dim)
+            Text(title).font(.system(size: 15)).foregroundStyle(KB.text)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+    }
+
     private var colorRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -182,6 +203,12 @@ struct CourseEditorView: View {
                                 Divider()
                                 FieldRow(label: "单价（元/节）*", text: $price, placeholder: "90", keyboard: .decimalPad)
                                 Divider()
+                                if course == nil || !isPool {
+                                    Toggle("这是一张年卡（课时池）", isOn: $isPool)
+                                        .font(.system(size: 15))
+                                        .padding(.vertical, 8)
+                                    Divider()
+                                }
                                 DatePicker("购买时间*", selection: $purchased, displayedComponents: .date)
                                     .font(.system(size: 15))
                                     .padding(.vertical, 8)
@@ -193,6 +220,36 @@ struct CourseEditorView: View {
                                 colorRow
                             }
                             .padding(.horizontal, 16)
+                        }
+
+                        // 年卡不排课，普通课才需要选池
+                        if !isPool && !poolOptions.isEmpty {
+                            Card {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text("课时从哪扣").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Spacer()
+                                        Text("共用一张年卡")
+                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                    }
+                                    Button {
+                                        noPool = true; poolID = nil
+                                    } label: {
+                                        pickRow(title: "自己管自己的课时", on: noPool)
+                                    }
+                                    .buttonStyle(.plain)
+                                    ForEach(poolOptions) { p in
+                                        Button {
+                                            noPool = false; poolID = p.id
+                                        } label: {
+                                            pickRow(title: "\(p.name)（剩 \(store.poolRemaining(p.id)) 节）",
+                                                    on: !noPool && poolID == p.id)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
                         }
 
                         if course != nil {
@@ -243,6 +300,9 @@ struct CourseEditorView: View {
                     purchased = c.boughtAt
                     babyIDs = Set(c.babyIDs)
                     colorHex = c.color
+                    isPool = c.isPool
+                    poolID = c.poolID
+                    noPool = c.poolID == nil
                 }
             }
         }
@@ -275,6 +335,9 @@ struct CourseEditorView: View {
             store.courses[i].expiry = KBDate.day(expiry)
             store.courses[i].purchasedAt = KBDate.day(purchased)
             store.courses[i].colorHex = colorHex
+            store.courses[i].isPool = isPool
+            // 年卡自己不挂池；普通课按选择挂或不挂
+            store.courses[i].poolID = isPool ? nil : (noPool ? nil : poolID)
             if advance, let add = Int(advanceLessons), add > 0 {
                 let np = Double(advancePrice) ?? 0
                 store.charge(c.id, lessons: add, price: np, note: "续费",
@@ -283,7 +346,8 @@ struct CourseEditorView: View {
         } else {
             let c = Course(babyIDs: ordered, name: n, tag: tag, total: t,
                            pricePerLesson: p, expiry: KBDate.day(expiry),
-                           purchasedAt: KBDate.day(purchased), colorHex: colorHex)
+                           purchasedAt: KBDate.day(purchased), colorHex: colorHex,
+                           isPool: isPool, poolID: isPool ? nil : (noPool ? nil : poolID))
             store.courses.append(c)
             if t > 0 {
                 store.ledger.append(LedgerEntry(courseID: c.id, date: KBDate.day(purchased),

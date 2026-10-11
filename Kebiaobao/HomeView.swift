@@ -127,7 +127,7 @@ struct HomeView: View {
 
     private var statCard: some View {
         let list = store.courses(for: store.scope)
-        let remain = list.reduce(0) { $0 + store.remaining($1) }
+        let remain = store.totalRemaining(babyID: store.scope)
         // 进行中 = 还有剩余课时的课程（原来与「总课程」都是 list.count，恒等）
         let active = list.filter { store.remaining($0) > 0 }.count
         return Card {
@@ -386,7 +386,8 @@ struct HomeView: View {
 
     private func courseRow(_ c: Course) -> some View {
         let used = store.consumed(c.id)
-        let left = c.total - used
+        let left = store.remaining(c)
+        let poolName = c.poolID.flatMap { store.course($0)?.name }
         let col = Color.course(c.color)
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
@@ -403,11 +404,17 @@ struct HomeView: View {
                 Text("¥\(Int(c.pricePerLesson))/节")
                     .font(.system(size: 12)).foregroundStyle(KB.dim)
             }
-            KBProgress(value: used, total: c.total,
+            KBProgress(value: poolName == nil ? used : store.poolConsumed(store.pool(of: c.id)?.id ?? c.id),
+                       total: store.pool(of: c.id)?.total ?? c.total,
                        color: left <= 3 ? KB.warn : col)
             HStack {
-                Text("已上 \(used) / \(c.total) 节")
-                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                if let pn = poolName {
+                    Text("本课已上 \(used) 节 · 共用「\(pn)」池内剩 \(left) 节")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                } else {
+                    Text("已上 \(used) / \(c.total) 节")
+                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                }
                 Spacer()
                 Text(left <= 0 ? "已完成" : "剩余 \(left) 节")
                     .font(.system(size: 12, weight: .medium))

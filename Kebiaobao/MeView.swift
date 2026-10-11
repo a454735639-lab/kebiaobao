@@ -273,7 +273,7 @@ struct MeView: View {
 
     private var statCard: some View {
         let list = store.courses(for: store.scope)
-        let remain = list.reduce(0) { $0 + store.remaining($1) }
+        let remain = store.totalRemaining(babyID: store.scope)
         return Card {
             HStack(spacing: 0) {
                 StatTile(value: "\(list.count)", label: "总课程")

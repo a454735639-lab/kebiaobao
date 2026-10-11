@@ -583,7 +583,7 @@ struct ManualEntryEditorView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(c.name).font(.system(size: 15, weight: .medium))
-                                    Text("\(store.remaining(c))/\(c.total) 节 · \(c.tag)")
+                                    Text("\(store.remaining(c))/\(store.pool(of: c.id)?.total ?? c.total) 节 · \(c.tag)")
                                         .font(.system(size: 12)).foregroundStyle(KB.dim)
                                 }
                                 Spacer()
