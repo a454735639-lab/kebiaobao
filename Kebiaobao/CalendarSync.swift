@@ -78,12 +78,11 @@ enum CalendarSync {
 
                 for offset in 0..<days {
                     guard let day = KBDate.cal.date(byAdding: .day, value: offset, to: today) else { continue }
-                    // 法定节假日不写日历（调休补班日照写）
-                    let skip = c.holidayOverride.map { !$0 } ?? skipHolidays
-                    if skip && Holiday.isHoliday(day) { continue }
                     let wd = KBDate.cal.component(.weekday, from: day)
                     for t in templates where t.weekdays.contains(wd) {
                         guard let c = courseByID[t.courseID], !c.archived else { continue }
+                        // 法定节假日不写日历（调休补班日照写）。单课设了覆盖就按它自己的来
+                        if (c.holidayOverride.map { !$0 } ?? skipHolidays) && Holiday.isHoliday(day) { continue }
                         // 购买日之前不写日历（和课表口径一致）
                         guard day >= KBDate.day(c.boughtAt) else { continue }
                         let s = t.slot(for: wd)
