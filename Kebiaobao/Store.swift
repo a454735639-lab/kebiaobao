@@ -465,6 +465,9 @@ final class Store: ObservableObject {
         // 删的是年卡：挂在它下面的课改为自成一池，不跟着消失
         for i in courses.indices where courses[i].poolID == id {
             courses[i].poolID = nil
+            // 池子剩余课时是共用的，无法拆分 → 至少把本课已上的部分补齐，
+            // 免得 total 小于已上数、剩余显示成负数
+            courses[i].total = max(courses[i].total, consumed(courses[i].id))
         }
         courses.removeAll { $0.id == id }
         templates.removeAll { $0.courseID == id }

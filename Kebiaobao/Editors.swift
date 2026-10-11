@@ -105,6 +105,8 @@ struct CourseEditorView: View {
     /// 这门课从哪张年卡扣课时。nil = 自己管自己的课时
     @State private var poolID: UUID?
     @State private var noPool = true
+    /// 删除确认（课程与年卡都能从这里删，池卡原本没有可达入口）
+    @State private var confirmDelete = false
 
     /// 可选的年卡列表（不含自己）
     private var poolOptions: [Course] {
@@ -281,6 +283,10 @@ struct CourseEditorView: View {
                         .padding(.horizontal, 4)
 
                         KBButton(title: course == nil ? "添加课程" : "保存修改") { commit() }
+                        if course != nil {
+                            KBButton(title: isPool ? "删除年卡" : "删除课程",
+                                     filled: false, tint: KB.danger) { confirmDelete = true }
+                        }
                         Spacer()
                     }
                     .padding(16)
@@ -290,6 +296,17 @@ struct CourseEditorView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+            }
+            .alert(isPool ? "删除年卡？" : "删除课程？", isPresented: $confirmDelete) {
+                Button("取消", role: .cancel) {}
+                Button("删除", role: .destructive) {
+                    if let c = course { store.deleteCourse(c.id) }
+                    dismiss()
+                }
+            } message: {
+                Text(isPool
+                     ? "挂在它下面的课程会改为各自独立计课时，不会跟着被删。年卡自身的课时流水会一并删除，不可恢复。删除前会自动备份，可在「我的 → 备份与恢复」里还原。"
+                     : "将同时删除该课程的排课与全部课时流水，不可恢复。删除前会自动备份，可在「我的 → 备份与恢复」里还原。")
             }
             .onAppear {
                 if let c = course {
