@@ -22,10 +22,9 @@ enum Holiday {
         return d
     }()
 
-    /// 数据覆盖的年份范围（保留：日历年份选择器可用）
-    static var coveredYears: [Int] {
+    /// 数据覆盖的年份（保留：日历年份选择器可用）。缓存，避免每次日期渲染都遍历全表。
+    static let coveredYears: [Int] =
         Set(table.keys.compactMap { Int($0.prefix(4)) }).sorted()
-    }
 
     private static let key: DateFormatter = {
         let f = DateFormatter()

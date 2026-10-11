@@ -143,12 +143,17 @@ enum Lunar {
 
     // MARK: - 节气
 
-    /// 1900–2100 年逐年第 24 节气日，两位数字拼接（`2 位数 × 24 × 201 年`）
-    private static let termTable: String = {
+    /// 1900–2100 年逐年第 24 节气日。启动时一次性解析成扁平字节数组，
+    /// 避免每次日期渲染都做 String 索引（原实现每个格子 O(n)）。
+    private static let termDays: [UInt8] = {
         guard let url = Bundle.main.url(forResource: "solarterms", withExtension: "txt"),
               let s = try? String(contentsOf: url, encoding: .utf8)
-        else { return "" }
-        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        else { return [] }
+        let digits = s.utf8.compactMap { $0 >= 48 && $0 <= 57 ? $0 - 48 : nil }
+        guard digits.count % 2 == 0 else { return [] }
+        var out = [UInt8](repeating: 0, count: digits.count / 2)
+        for i in 0..<out.count { out[i] = digits[i * 2] * 10 + digits[i * 2 + 1] }
+        return out
     }()
 
     /// 当天节气名（无则 nil）
@@ -156,17 +161,11 @@ enum Lunar {
         let comps = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: date)
         guard let y = comps.year, let m = comps.month, let d = comps.day else { return nil }
         guard y >= 1900, y <= 2100 else { return nil }
-        let start = (y - 1900) * 48
-        guard termTable.count >= start + 48 else { return nil }
-        let idx = termTable.index(termTable.startIndex, offsetBy: start)
-        for k in 0..<24 {
-            let a = termTable.index(idx, offsetBy: k * 2)
-            let b = termTable.index(after: a)
-            if Int(String(termTable[a...b])) == d {
-                // 只显示在对应月份，避免同日不同月误判
-                let monthOfTerm = (k / 2) + 1
-                if monthOfTerm == m { return termName[k] }
-            }
+        let start = (y - 1900) * 24
+        guard termDays.count >= start + 24 else { return nil }
+        // 每个月的两个节气紧邻：k = (m-1)*2, (m-1)*2+1
+        for k in [(m - 1) * 2, (m - 1) * 2 + 1] {
+            if Int(termDays[start + k]) == d { return termName[k] }
         }
         return nil
     }
