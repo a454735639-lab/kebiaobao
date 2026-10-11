@@ -170,7 +170,9 @@ struct MeView: View {
                 .padding(.horizontal, 20).padding(.vertical, 10)
                 .background(KB.bg)
             }
-            .sheet(isPresented: $showImport) { importSheet }
+            .sheet(isPresented: $showImport, onDismiss: {
+                if let p = stashed { stashed = nil; pending = p }
+            }) { importSheet }
             .onAppear { refreshNotifyStatus() }
             // 开关变动后重写日历，否则关了「节假日不排课」日历仍是旧的跳过结果
             .onChange(of: store.skipHolidays) { _, _ in
@@ -429,9 +431,10 @@ struct MeView: View {
             let scoped = url.startAccessingSecurityScopedResource()
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let p = try store.parseXLSX(Data(contentsOf: url))
+            // 暂存解析结果，等导入 sheet 真正消失后由 onDismiss 同步弹出确认页。
+            // 原来的做法是延后 0.35s 赋值，用户若先关掉 sheet 数据就悄悄丢了。
+            stashed = p
             showImport = false
-            // 等导入 sheet 完全消失再弹确认页，避免同帧切换 sheet 丢失
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { pending = p }
         } catch {
             toast = "导入失败：\(error.localizedDescription)"
         }

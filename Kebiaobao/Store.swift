@@ -255,13 +255,6 @@ final class Store: ObservableObject {
         return .ok
     }
 
-    func takeLeave(_ template: LessonTemplate, on date: Date) {
-        let e = LedgerEntry(courseID: template.courseID, date: date,
-                            delta: 0, kind: .leave, note: "请假（不扣课时）")
-        ledger.append(e)
-        save()
-    }
-
     func charge(_ courseID: UUID, lessons: Int, price: Double, note: String) {
         guard let i = courses.firstIndex(where: { $0.id == courseID }) else { return }
         let unit = price > 0 ? price : courses[i].pricePerLesson
@@ -338,6 +331,8 @@ final class Store: ObservableObject {
         guard let i = ledger.firstIndex(where: { $0.id == entry.id }) else { return }
         if entry.kind == .charge, let ci = courses.firstIndex(where: { $0.id == entry.courseID }) {
             courses[ci].total -= entry.delta
+            // 撤销充值同时还原被改掉的单价，否则单价永久留在新值
+            if let prev = entry.prevPrice { courses[ci].pricePerLesson = prev }
         }
         ledger.remove(at: i)
         save()
@@ -531,15 +526,16 @@ final class Store: ObservableObject {
         let slotRows = table(sheets, "排课", requiring: ["排课ID", "星期"]).filter {
             courseIDs.contains(UUID(uuidString: $0["课程ID"] ?? "") ?? UUID())
         }
-        var grouped: [UUID: [String: String]] = [:]
+        // 先按排课ID 分组：原来对每个模板都重扫一遍全表，是 O(模板 × 行数)
+        var byTemplate: [UUID: [[String: String]]] = [:]
         var order: [UUID] = []
         for r in slotRows {
             guard let tid = UUID(uuidString: r["排课ID"] ?? "") else { continue }
-            if grouped[tid] == nil { grouped[tid] = r; order.append(tid) }
+            if byTemplate[tid] == nil { order.append(tid) }
+            byTemplate[tid, default: []].append(r)
         }
         for tid in order {
-            guard let r = grouped[tid] else { continue }
-            let days = slotRows.filter { $0["排课ID"] == r["排课ID"] }
+            guard let days = byTemplate[tid], let r = days.first else { continue }
             let weeks = days.compactMap { d -> Int? in
                 guard let n = KBDate.weekdayCN.firstIndex(of: d["星期"] ?? "") else { return nil }
                 return n == 0 ? nil : n

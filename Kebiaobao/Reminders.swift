@@ -59,13 +59,4 @@ enum KBReminder {
             }
         }
     }
-
-    /// 清空全部排课提醒
-    static func clearAll() {
-        let center = UNUserNotificationCenter.current()
-        center.getPendingNotificationRequests { pending in
-            let ids = pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
-            center.removePendingNotificationRequests(withIdentifiers: ids)
-        }
-    }
 }

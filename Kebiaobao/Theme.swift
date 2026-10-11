@@ -78,25 +78,6 @@ struct Card<Content: View>: View {
     }
 }
 
-/// 页面大标题
-struct NavHeader: View {
-    let title: String
-    var trailing: AnyView? = nil
-
-    var body: some View {
-        HStack(alignment: .center) {
-            Text(title)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(KB.text)
-            Spacer()
-            if let trailing { trailing }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-    }
-}
-
 /// 进度条
 struct KBProgress: View {
     let value: Int

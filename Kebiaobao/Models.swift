@@ -11,13 +11,6 @@ enum RecordKind: String, Codable, CaseIterable, Identifiable {
         case .refund: return "撤销"
         }
     }
-    var sign: String {
-        switch self {
-        case .charge: return "+"
-        case .consume: return "-"
-        default: return ""
-        }
-    }
 }
 
 struct Baby: Identifiable, Codable, Hashable {
@@ -124,13 +117,6 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
     /// 按星期排序的全部安排
     var orderedSlots: [DaySlot] { weekdays.sorted().map { slot(for: $0) } }
 
-    /// 是否每天都用同一套时间/老师
-    var isUniform: Bool {
-        let s = orderedSlots
-        guard let f = s.first else { return true }
-        return s.allSatisfy { $0.hour == f.hour && $0.minute == f.minute && $0.teacher == f.teacher }
-    }
-
     /// 手写解码：`slots` / `remindMinutes` 等后加字段在旧快照里不存在，
     /// 合成的 init(from:) 会当必填直接抛错，整包数据就废了。
     init(from decoder: Decoder) throws {
@@ -198,6 +184,7 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
         note = try c.decodeIfPresent(String.self, forKey: .note) ?? ""
         summary = try c.decodeIfPresent(String.self, forKey: .summary)
         unitPrice = try c.decodeIfPresent(Double.self, forKey: .unitPrice)
+        prevPrice = try c.decodeIfPresent(Double.self, forKey: .prevPrice)
     }
 }
 

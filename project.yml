@@ -11,7 +11,7 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "1.9.3"
+    MARKETING_VERSION: "1.9.4"
     # CURRENT_PROJECT_VERSION 由 CI 用 GitHub run_number 覆盖，保证每次构建递增
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
