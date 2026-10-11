@@ -121,7 +121,7 @@ struct MeView: View {
                         group("数据管理") {
                             navBaby()
                             navCourse()
-                            row("plus.circle.fill", "手动记账", "不限日期，直接加／扣课时") {
+                            row("plus.circle.fill", "手动记账", "不限日期，手动加课时或打卡") {
                                 showManual = true
                             }
                             navLedger()

@@ -102,7 +102,7 @@ struct CourseEditorView: View {
     @State private var colorHex: UInt32 = KBPalette.colors[0]
     /// 年卡（课时池）编辑模式
     @State private var isPool = false
-    /// 这门课从哪张年卡扣课时。nil = 自己管自己的课时
+    /// 这门课从哪张年卡扣课时。nil = 自己管自己的课时（普通课）
     @State private var poolID: UUID?
     @State private var noPool = true
     /// 删除确认（课程与年卡都能从这里删，池卡原本没有可达入口）

@@ -170,7 +170,7 @@ struct TemplateEditorView: View {
                         Card(padding: 0) {
                             VStack(spacing: 0) {
                                 HStack {
-                                    Text("每次划扣课时").font(.system(size: 15)).foregroundStyle(KB.text)
+                                    Text("每次打卡扣课时").font(.system(size: 15)).foregroundStyle(KB.text)
                                     Spacer()
                                     Stepper("", value: $deduct, in: 1...10).labelsHidden()
                                     Text("\(deduct) 课时")

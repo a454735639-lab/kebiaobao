@@ -206,7 +206,7 @@ final class Store: ObservableObject {
     }
 
     /// 课时池（年卡）：本身不排课，供多门课多宝宝共用课时
-    /// 这门课从哪个池扣课时：有 poolID 就指向年卡，否则自己就是一个池
+    /// 这门课从哪个池打卡扣课时：有 poolID 就指向年卡，否则自己就是一个池
     func pool(of courseID: UUID) -> Course? {
         guard let c = course(courseID) else { return nil }
         if let pid = c.poolID { return course(pid) ?? c }
@@ -346,7 +346,7 @@ final class Store: ObservableObject {
         template.babyID ?? course(template.courseID)?.babyIDs.first
     }
 
-    /// 打卡。同一天同一排课（同一宝宝）已有扣课记录时返回 .duplicate，不重复记账。
+    /// 打卡。同一天同一排课（同一宝宝）已有打卡记录时返回 .duplicate，不重复记账。
     @discardableResult
     func checkIn(_ template: LessonTemplate, on date: Date) -> CheckInResult {
         if isExpired(template.courseID) { return .expired }
@@ -384,7 +384,7 @@ final class Store: ObservableObject {
         save()
     }
 
-    /// 手动记账：扣课时 / 请假 / 加课时。独立于排课，可自选日期与课时数。
+    /// 手动记账：打卡扣课时 / 请假 / 加课时。独立于排课，可自选日期与课时数。
     enum ManualOp: Hashable { case consume, leave, charge }
 
     func recordManual(_ op: ManualOp, courseID: UUID, lessons: Int, date: Date,
@@ -445,7 +445,7 @@ final class Store: ObservableObject {
 
     static func manualDefaultNote(_ op: ManualOp) -> String {
         switch op {
-        case .consume: return "手动扣课时"
+        case .consume: return "手动打卡"
         case .leave:   return "请假（不扣课时）"
         case .charge:  return "补录课时"
         }
@@ -560,7 +560,7 @@ final class Store: ObservableObject {
         }
 
         var slotRows: [[String]] = [["排课ID", "课程ID", "课程", "星期", "时间",
-                                     "老师", "地点", "每次划扣", "提前提醒(分)", "归属宝贝ID"]]
+                                     "老师", "地点", "每次打卡", "提前提醒(分)", "归属宝贝ID"]]
         for t in templates where ids.contains(t.courseID) {
             for s in t.orderedSlots {
                 slotRows.append([t.id.uuidString, t.courseID.uuidString,
@@ -727,7 +727,7 @@ final class Store: ObservableObject {
                 id: tid, courseID: cid, weekdays: weeks.sorted(),
                 hour: first?.hour ?? 0, minute: first?.minute ?? 0,
                 place: first?.place ?? "", teacher: first?.teacher ?? "",
-                deduct: Int(r["每次划扣"] ?? "") ?? 1,
+                deduct: Int(r["每次打卡"] ?? r["每次划扣"] ?? "") ?? 1,
                 remindMinutes: Int(r["提前提醒(分)"] ?? "") ?? 0,
                 slots: slots,
                 babyID: UUID(uuidString: r["归属宝贝ID"] ?? "")))

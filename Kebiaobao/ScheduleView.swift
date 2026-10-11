@@ -334,7 +334,7 @@ struct ScheduleView: View {
             }
             Spacer()
             Button { selected = day; sheet = .checkIn(t) } label: {
-                Text("扣课")
+                Text("打卡")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(KB.onAccent)
                     .padding(.horizontal, 12).padding(.vertical, 6)
@@ -384,7 +384,7 @@ struct ManualEntryEditorView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("操作").font(.system(size: 15, weight: .semibold))
                                 HStack(spacing: 8) {
-                                    opChip(.consume, "扣课时", KB.warn)
+                                    opChip(.consume, "打卡", KB.warn)
                                     opChip(.leave, "请假", KB.dim)
                                     opChip(.charge, "加课时", KB.accent)
                                 }
@@ -525,7 +525,7 @@ struct ManualEntryEditorView: View {
             .alert("课程已过期", isPresented: $expiredAlert) {
                 Button("好") { }
             } message: {
-                Text("这门课的有效期已过，不能再扣课时。要续期请到课程编辑里改「有效期至」。")
+                Text("这门课的有效期已过，不能再打卡。要续期请到课程编辑里改「有效期至」。")
             }
             .sheet(isPresented: $showPicker) { coursePicker }
         }
@@ -622,7 +622,7 @@ struct ManualEntryEditorView: View {
 
     private func save() {
         guard let id = courseID else { return }
-        // 到期课程禁止再扣课（与打卡同一规则）；请假/加课时不受限
+        // 到期课程禁止再打卡（与排课打卡同一规则）；请假/加课时不受限
         if op == .consume && store.isExpired(id) { expiredAlert = true; return }
         let opts = ownerOptions
         let who = opts.isEmpty ? nil : (ownerBabyID.flatMap { p in opts.contains { $0.id == p } ? p : nil } ?? opts.first?.id)
@@ -669,7 +669,7 @@ struct CheckInSheet: View {
                     Card {
                         VStack(spacing: 0) {
                             HStack {
-                                Text("本次划扣").font(.system(size: 15)).foregroundStyle(KB.text)
+                                Text("本次打卡").font(.system(size: 15)).foregroundStyle(KB.text)
                                 Spacer()
                                 Stepper("\(deduct) 课时", value: $deduct, in: 1...10)
                                     .labelsHidden()
@@ -694,7 +694,7 @@ struct CheckInSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
-                    KBButton(title: "确认扣课 \(deduct) 课时", icon: "checkmark.circle.fill") {
+                    KBButton(title: "确认打卡 \(deduct) 课时", icon: "checkmark.circle.fill") {
                         var t = template
                         t.deduct = deduct
                         switch store.checkIn(t, on: date) {
@@ -720,11 +720,11 @@ struct CheckInSheet: View {
                 switch kind {
                 case .duplicate:
                     return Alert(title: Text("今天已经打过卡"),
-                                 message: Text("这门课今天已有扣课记录。如需调整，请到课时流水里撤销或改备注。"),
+                                 message: Text("这门课今天已有打卡记录。如需调整，请到课时流水里撤销或改备注。"),
                                  dismissButton: .default(Text("好")) { dismiss() })
                 case .expired:
                     return Alert(title: Text("课程已过期"),
-                                 message: Text("这门课的有效期已过，不能再扣课时。要续期请到课程编辑里改「有效期至」。"),
+                                 message: Text("这门课的有效期已过，不能再打卡。要续期请到课程编辑里改「有效期至」。"),
                                  dismissButton: .default(Text("好")))
                 }
             }

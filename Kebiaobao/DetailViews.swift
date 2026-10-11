@@ -206,7 +206,7 @@ struct CourseDetailView: View {
                             }
                         }
                         HStack {
-                            Text("每次划扣 \(t.deduct) 课时")
+                            Text("每次打卡扣 \(t.deduct) 课时")
                                 .font(.system(size: 11)).foregroundStyle(KB.dim)
                             Spacer()
                             Button {

@@ -6,7 +6,7 @@ enum RecordKind: String, Codable, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .charge: return "充值"
-        case .consume: return "扣课"
+        case .consume: return "打卡"
         case .leave: return "请假"
         case .refund: return "撤销"
         }
@@ -140,7 +140,7 @@ struct LessonTemplate: Identifiable, Codable, Hashable {
     var minute: Int
     var place: String
     var teacher: String
-    var deduct: Int              // 每次划扣课时
+    var deduct: Int              // 每次打卡扣课时
     var remindMinutes: Int       // 提前提醒分钟
     /// 每个星期几单独的时间／老师／地点。空则回退到上面的 hour/minute/teacher/place
     var slots: [DaySlot] = []
@@ -203,7 +203,7 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var id = UUID()
     var courseID: UUID
     var date: Date
-    var delta: Int               // 正=充值，负=扣课
+    var delta: Int               // 正=充值，负=打卡
     var kind: RecordKind
     var note: String
     /// 课后小结（可选，旧数据解码为 nil）

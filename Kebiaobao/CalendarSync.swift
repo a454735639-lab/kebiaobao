@@ -100,7 +100,7 @@ enum CalendarSync {
                         ev.location = s.place
                         ev.startDate = begin
                         ev.endDate = begin.addingTimeInterval(60 * 60)   // 默认 1 小时
-                        ev.notes = "课时宝排课 · 划扣 \(t.deduct) 课时 · 剩余 \(remaining[c.id] ?? 0) 课时"
+                        ev.notes = "课时宝排课 · 打卡 \(t.deduct) 课时 · 剩余 \(remaining[c.id] ?? 0) 课时"
                         if t.remindMinutes > 0 {
                             ev.addAlarm(EKAlarm(relativeOffset: -Double(t.remindMinutes) * 60))
                         }

@@ -227,7 +227,7 @@ struct HomeView: View {
                 KBButton(title: "请假", filled: false, tint: KB.dim) {
                     sheet = .manual(t, date, .leave)
                 }
-                KBButton(title: "扣课时", icon: "checkmark.circle.fill") {
+                KBButton(title: "打卡", icon: "checkmark.circle.fill") {
                     sheet = .manual(t, date, .consume)
                 }
             }
