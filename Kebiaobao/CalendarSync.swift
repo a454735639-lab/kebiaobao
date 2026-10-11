@@ -79,7 +79,8 @@ enum CalendarSync {
                 for offset in 0..<days {
                     guard let day = KBDate.cal.date(byAdding: .day, value: offset, to: today) else { continue }
                     // 法定节假日不写日历（调休补班日照写）
-                    if skipHolidays && Holiday.isHoliday(day) { continue }
+                    let skip = c.holidayOverride.map { !$0 } ?? skipHolidays
+                    if skip && Holiday.isHoliday(day) { continue }
                     let wd = KBDate.cal.component(.weekday, from: day)
                     for t in templates where t.weekdays.contains(wd) {
                         guard let c = courseByID[t.courseID], !c.archived else { continue }

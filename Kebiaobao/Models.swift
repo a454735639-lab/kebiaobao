@@ -38,6 +38,8 @@ struct Course: Identifiable, Codable, Hashable {
     var isPool: Bool = false
     /// 这门课的课时从哪张年卡扣。nil = 自己就是一个池（普通课，老数据）
     var poolID: UUID? = nil
+    /// 节假日是否照常上课。nil = 跟随全局「法定节假日不排课」开关
+    var holidayOverride: Bool? = nil
 
     var totalFee: Double { Double(total) * pricePerLesson }
     var boughtAt: Date { purchasedAt ?? createdAt }
@@ -50,12 +52,13 @@ struct Course: Identifiable, Codable, Hashable {
     init(id: UUID = UUID(), babyIDs: [UUID], name: String, tag: String, total: Int,
          pricePerLesson: Double, expiry: Date, createdAt: Date = Date(),
          purchasedAt: Date? = nil, archived: Bool = false, colorHex: UInt32? = nil,
-         isPool: Bool = false, poolID: UUID? = nil) {
+         isPool: Bool = false, poolID: UUID? = nil, holidayOverride: Bool? = nil) {
         self.id = id; self.babyIDs = babyIDs; self.name = name; self.tag = tag
         self.total = total; self.pricePerLesson = pricePerLesson; self.expiry = expiry
         self.createdAt = createdAt; self.purchasedAt = purchasedAt
         self.archived = archived; self.colorHex = colorHex
         self.isPool = isPool; self.poolID = poolID
+        self.holidayOverride = holidayOverride
     }
 
     /// 手写解码：合成的 init(from:) 会忽略属性默认值，旧快照缺键就会整包解码失败
@@ -81,12 +84,13 @@ struct Course: Identifiable, Codable, Hashable {
         colorHex = try c.decodeIfPresent(UInt32.self, forKey: .colorHex)
         isPool = try c.decodeIfPresent(Bool.self, forKey: .isPool) ?? false
         poolID = try c.decodeIfPresent(UUID.self, forKey: .poolID)
+        holidayOverride = try c.decodeIfPresent(Bool.self, forKey: .holidayOverride)
     }
 
     /// 显式 CodingKeys：保留旧的单值 `babyID` 只用于读旧快照
     private enum CodingKeys: String, CodingKey {
         case id, babyIDs, babyID, name, tag, total, pricePerLesson, expiry
-        case createdAt, purchasedAt, archived, colorHex, isPool, poolID
+        case createdAt, purchasedAt, archived, colorHex, isPool, poolID, holidayOverride
     }
 
     /// 只写新字段，不再输出单值 babyID
@@ -105,6 +109,7 @@ struct Course: Identifiable, Codable, Hashable {
         try c.encodeIfPresent(colorHex, forKey: .colorHex)
         try c.encode(isPool, forKey: .isPool)
         try c.encodeIfPresent(poolID, forKey: .poolID)
+        try c.encodeIfPresent(holidayOverride, forKey: .holidayOverride)
     }
 }
 

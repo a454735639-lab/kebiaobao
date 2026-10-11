@@ -105,6 +105,8 @@ struct CourseEditorView: View {
     /// 这门课从哪张年卡扣课时。nil = 自己管自己的课时（普通课）
     @State private var poolID: UUID?
     @State private var noPool = true
+    /// 节假日：nil = 跟随全局设置
+    @State private var holidayOverride: Bool?
     /// 删除确认（课程与年卡都能从这里删，池卡原本没有可达入口）
     @State private var confirmDelete = false
 
@@ -254,6 +256,33 @@ struct CourseEditorView: View {
                             }
                         }
 
+                        // 节假日：全局开关管不到的课在这里单独放行（有些课就排在节假日）
+                        if !isPool {
+                            Card {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack {
+                                        Text("法定节假日").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Spacer()
+                                        Text(store.skipHolidays ? "全局：不上课" : "全局：照常上课")
+                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                    }
+                                    Button { holidayOverride = nil } label: {
+                                        pickRow(title: "跟随全局设置", on: holidayOverride == nil)
+                                    }
+                                    .buttonStyle(.plain)
+                                    Button { holidayOverride = true } label: {
+                                        pickRow(title: "这张课照常上课", on: holidayOverride == true)
+                                    }
+                                    .buttonStyle(.plain)
+                                    Button { holidayOverride = false } label: {
+                                        pickRow(title: "这张课不上课", on: holidayOverride == false)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
+
                         if course != nil {
                             Card(padding: 0) {
                                 VStack(spacing: 0) {
@@ -320,6 +349,7 @@ struct CourseEditorView: View {
                     isPool = c.isPool
                     poolID = c.poolID
                     noPool = c.poolID == nil
+                    holidayOverride = c.holidayOverride
                 }
             }
         }
@@ -355,6 +385,8 @@ struct CourseEditorView: View {
             store.courses[i].isPool = isPool
             // 年卡自己不挂池；普通课按选择挂或不挂
             store.courses[i].poolID = isPool ? nil : (noPool ? nil : poolID)
+            // 年卡不排课，节假日设置对它无意义
+            store.courses[i].holidayOverride = isPool ? nil : holidayOverride
             if advance, let add = Int(advanceLessons), add > 0 {
                 let np = Double(advancePrice) ?? 0
                 store.charge(c.id, lessons: add, price: np, note: "续费",
@@ -364,7 +396,8 @@ struct CourseEditorView: View {
             let c = Course(babyIDs: ordered, name: n, tag: tag, total: t,
                            pricePerLesson: p, expiry: KBDate.day(expiry),
                            purchasedAt: KBDate.day(purchased), colorHex: colorHex,
-                           isPool: isPool, poolID: isPool ? nil : (noPool ? nil : poolID))
+                           isPool: isPool, poolID: isPool ? nil : (noPool ? nil : poolID),
+                           holidayOverride: isPool ? nil : holidayOverride)
             store.courses.append(c)
             // 挂在年卡上的课没有自己的课时，别记「初始购买」，否则课时凭空多一份
             if t > 0 && c.poolID == nil {

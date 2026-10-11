@@ -303,12 +303,14 @@ final class Store: ObservableObject {
     /// 法定节假日（且未关闭该规则）返回空 —— 调休补班日照常上课。
     /// 购买日之前不排课（旧数据 boughtAt 回退到 createdAt）。
     func lessons(on date: Date, babyID: UUID?) -> [LessonTemplate] {
-        if isSkipped(date) { return [] }
         let w = KBDate.cal.component(.weekday, from: date)
         let d = KBDate.day(date)
+        // 节假日只对「跟随全局」的课程生效；单课设了 holidayOverride 就按它自己的来
+        let holiday = Holiday.isHoliday(date)
         // course(_:) 走字典索引，不再是 O(课程数) 扫描
         return templates.filter { t in
             guard t.weekdays.contains(w), let c = course(t.courseID), !c.archived else { return false }
+            if holiday && (c.holidayOverride.map { !$0 } ?? skipHolidays) { return false }
             guard d >= KBDate.day(c.boughtAt) else { return false }
             guard let s = babyID else { return true }
             // 排课指定了归属就用它；否则按课程成员判定（共用年卡两个宝宝都看得到）
@@ -540,7 +542,7 @@ final class Store: ObservableObject {
 
         var courseRows: [[String]] = [["ID", "宝贝ID", "宝贝", "课程", "标签",
                                        "总课时", "已用", "剩余", "单价", "总价", "购买时间", "到期日",
-                                       "年卡", "年卡ID"]]
+                                       "年卡", "年卡ID", "节假日"]]
         for c in cs {
             // 池卡的「已用」只统计本次导出的课程，否则数字与文件内容对不上
             let used = c.isPool
@@ -556,7 +558,8 @@ final class Store: ObservableObject {
                                KBDate.ymd.string(from: c.boughtAt),
                                KBDate.ymd.string(from: c.expiry),
                                c.isPool ? "是" : "",
-                               c.poolID?.uuidString ?? ""])
+                               c.poolID?.uuidString ?? "",
+                               c.holidayOverride.map { $0 ? "照常上课" : "不上课" } ?? ""])
         }
 
         var slotRows: [[String]] = [["排课ID", "课程ID", "课程", "星期", "时间",
@@ -680,7 +683,14 @@ final class Store: ObservableObject {
                            expiry: exp,
                            purchasedAt: KBDate.ymd.date(from: r["购买时间"] ?? ""),
                            isPool: (r["年卡"] ?? "") == "是",
-                           poolID: UUID(uuidString: r["年卡ID"] ?? ""))
+                           poolID: UUID(uuidString: r["年卡ID"] ?? ""),
+                           holidayOverride: {
+                               switch r["节假日"] ?? "" {
+                               case "照常上课": return true
+                               case "不上课": return false
+                               default: return nil
+                               }
+                           }())
             newCourses.append(c)
         }
         let courseIDs = Set(newCourses.map(\.id))
@@ -690,8 +700,11 @@ final class Store: ObservableObject {
             if let pid = newCourses[i].poolID, !courseIDs.contains(pid) {
                 newCourses[i].poolID = nil
             }
-            // 池卡不能挂在另一张池卡上
-            if newCourses[i].isPool { newCourses[i].poolID = nil }
+            // 池卡不能挂在另一张池卡上；也不排课，节假日设置无意义
+            if newCourses[i].isPool {
+                newCourses[i].poolID = nil
+                newCourses[i].holidayOverride = nil
+            }
         }
 
         // 排课：按排课ID 聚合，同一模板的多个星期合成一条

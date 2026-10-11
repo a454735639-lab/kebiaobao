@@ -133,7 +133,8 @@ struct MeView: View {
                             row("calendar.badge.plus", "同步到系统日历",
                                 calSub) { handleCalendarTap() }
                             toggleRow("calendar.badge.exclamationmark", "法定节假日不排课",
-                                      "节假日当天不显示课、不写日历（排课提醒仍按星期）", isOn: $store.skipHolidays)
+                                      "节假日当天不显示课、不写日历（排课提醒仍按星期）。单张课可在课程编辑里设为照常上课",
+                                      isOn: $store.skipHolidays)
                         }
                         group("外观") {
                             row("moon.stars", "深色模式",
