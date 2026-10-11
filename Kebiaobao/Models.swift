@@ -166,11 +166,15 @@ struct LedgerEntry: Identifiable, Codable, Hashable {
     var summary: String? = nil
     /// 记账当时的单价（旧数据为 nil，回退到课程当前单价）
     var unitPrice: Double? = nil
+    /// 充值前的课程单价：撤销这条充值时要还原，否则单价被永久改掉
+    var prevPrice: Double? = nil
 
     init(id: UUID = UUID(), courseID: UUID, date: Date, delta: Int,
-         kind: RecordKind, note: String, summary: String? = nil, unitPrice: Double? = nil) {
+         kind: RecordKind, note: String, summary: String? = nil, unitPrice: Double? = nil,
+         prevPrice: Double? = nil) {
         self.id = id; self.courseID = courseID; self.date = date; self.delta = delta
         self.kind = kind; self.note = note; self.summary = summary; self.unitPrice = unitPrice
+        self.prevPrice = prevPrice
     }
 
     /// 手写解码：`summary` / `unitPrice` 在旧快照里不存在
