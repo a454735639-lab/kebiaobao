@@ -26,10 +26,14 @@ final class Store: ObservableObject {
 
     private var statsDirty = true
     private var statCache: [UUID: (used: Int, spent: Double)] = [:]
+    /// 按月聚合的消课数：key = 年*100+月，value = 课程ID → 课时
+    private var monthStatCache: [Int: [UUID: Int]] = [:]
 
     private func stats() -> [UUID: (used: Int, spent: Double)] {
         if statsDirty {
             var m: [UUID: (used: Int, spent: Double)] = [:]
+            var byMonth: [Int: [UUID: Int]] = [:]
+            let cal = KBDate.cal
             let price = Dictionary(courses.map { ($0.id, $0.pricePerLesson) }, uniquingKeysWith: { a, _ in a })
             for e in ledger where e.delta < 0 {
                 let n = abs(e.delta)
@@ -38,8 +42,14 @@ final class Store: ObservableObject {
                 cur.used += n
                 cur.spent += Double(n) * p
                 m[e.courseID] = cur
+                // 同一趟遍历顺手按月分桶，供「本月」口径复用
+                let comps = cal.dateComponents([.year, .month], from: e.date)
+                if let y = comps.year, let mo = comps.month {
+                    byMonth[y * 100 + mo, default: [:]][e.courseID, default: 0] += n
+                }
             }
             statCache = m
+            monthStatCache = byMonth
             statsDirty = false
         }
         return statCache
@@ -163,7 +173,14 @@ final class Store: ObservableObject {
 
     func baby(_ id: UUID?) -> Baby? { babies.first { $0.id == id } }
 
-    func course(_ id: UUID) -> Course? { courses.first { $0.id == id } }
+    /// 按 id 取课程。走字典索引，不再是线性扫描
+    func course(_ id: UUID) -> Course? {
+        if indexDirty {
+            courseIndex = Dictionary(courses.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            indexDirty = false
+        }
+        return courseIndex[id]
+    }
 
     func courses(for babyID: UUID?) -> [Course] {
         courses.filter { (babyID == nil || $0.babyID == babyID) && !$0.archived }
