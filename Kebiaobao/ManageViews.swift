@@ -20,18 +20,18 @@ struct CourseManageView: View {
                 IconBadge(icon: "creditcard.fill", size: 34)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                        Text(p.name).font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
                         KBChip(text: "年卡", solid: true)
                     }
                     Text("\(store.babyNames(p.babyIDs)) · 共 \(p.total) 节 · 池内剩 \(left) 节")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                     Text(attached.isEmpty ? "还没挂课程"
                          : "已挂 \(attached.count) 门课：\(attached.map(\.name).joined(separator: "、"))")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                         .lineLimit(2)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(KB.dim)
+                Image(systemName: "chevron.right").font(.system(.caption)).foregroundStyle(KB.dim)
             }
         }
     }
@@ -57,10 +57,10 @@ struct CourseManageView: View {
                     if !pools.isEmpty {
                         HStack {
                             Text("年卡 · 课时池（\(pools.count)）")
-                                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                                .font(.system(.caption, weight: .medium)).foregroundStyle(KB.dim)
                             Spacer()
                             Button(showPools ? "收起" : "展开") { showPools.toggle() }
-                                .font(.system(size: 12)).foregroundStyle(KB.accent)
+                                .font(.system(.caption)).foregroundStyle(KB.accent)
                                 .buttonStyle(.plain)
                         }
                         .padding(.top, 8)
@@ -75,10 +75,10 @@ struct CourseManageView: View {
                     if !archived.isEmpty {
                         HStack {
                             Text("已结课（\(archived.count)）")
-                                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                                .font(.system(.caption, weight: .medium)).foregroundStyle(KB.dim)
                             Spacer()
                             Button(showArchived ? "收起" : "展开") { showArchived.toggle() }
-                                .font(.system(size: 12)).foregroundStyle(KB.accent)
+                                .font(.system(.caption)).foregroundStyle(KB.accent)
                                 .buttonStyle(.plain)
                         }
                         .padding(.top, 8)
@@ -88,16 +88,16 @@ struct CourseManageView: View {
                                     HStack(spacing: 12) {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(c.name)
-                                                .font(.system(size: 15, weight: .semibold))
+                                                .font(.system(.subheadline, weight: .semibold))
                                                 .foregroundStyle(KB.dim)
                                             Text("已上 \(store.consumed(c.id))/\(c.total) 节 · 流水保留")
-                                                .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption2)).foregroundStyle(KB.dim)
                                         }
                                         Spacer()
                                         Button {
                                             store.setArchived(c.id, false)
                                         } label: {
-                                            Text("恢复").font(.system(size: 12)).foregroundStyle(KB.accent)
+                                            Text("恢复").font(.system(.caption)).foregroundStyle(KB.accent)
                                         }
                                         .buttonStyle(.plain)
                                     }
@@ -127,22 +127,22 @@ struct CourseManageView: View {
                 IconBadge(icon: "book.closed.fill", tint: col, size: 34)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(c.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                        Text(c.name).font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
                         if !c.tag.isEmpty { KBChip(text: c.tag, tint: col) }
                     }
                     if let pn = poolName {
                         Text("\(store.babyNames(c.babyIDs)) · 共用「\(pn)」 · 池内剩 \(left) 节")
-                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                     } else {
                         Text("\(store.babyNames(c.babyIDs)) · 已上 \(used)/\(c.total) 节 · 剩余 \(left)")
-                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                     }
                     Text("购买 \(KBDate.ymd.string(from: c.boughtAt)) · 到期 \(KBDate.ymd.string(from: c.expiry))")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                 }
                 Spacer()
                 Image(systemName: "pencil")
-                    .font(.system(size: 13)).foregroundStyle(KB.accent)
+                    .font(.system(.caption)).foregroundStyle(KB.accent)
             }
         }
     }
@@ -162,7 +162,7 @@ struct BabyManageView: View {
                 VStack(spacing: 10) {
                     if store.babies.isEmpty {
                         Text("还没有宝贝档案")
-                            .font(.system(size: 13)).foregroundStyle(KB.dim)
+                            .font(.system(.caption)).foregroundStyle(KB.dim)
                             .padding(.vertical, 24)
                     }
                     ForEach(store.babies) { b in
@@ -190,26 +190,29 @@ struct BabyManageView: View {
                     store.save()
                 } label: {
                     Image(systemName: current ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 20))
+                        .font(.system(.title3))
                         .foregroundStyle(current ? KB.accent : KB.line)
                 }
                 .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(b.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                        Text(b.name).font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
                         if current { KBChip(text: "当前", solid: true) }
                     }
                     Text(b.birthday.map { "生日 \(KBDate.cnFull.string(from: $0)) · \(n) 门课程" }
                          ?? "\(n) 门课程")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                 }
                 Spacer()
                 Button { editing = b } label: {
                     Image(systemName: "pencil")
-                        .font(.system(size: 13)).foregroundStyle(KB.accent)
+                        .font(.system(.caption)).foregroundStyle(KB.accent)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("编辑 \(b.name)")
             }
         }
     }

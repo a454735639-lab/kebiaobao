@@ -9,14 +9,14 @@ struct DaySlotRow: View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 Text(slot.dayName.replacingOccurrences(of: "周", with: ""))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(.subheadline, weight: .semibold))
                     .foregroundStyle(KB.accent)
                     .frame(width: 34, height: 34)
                     .background(KB.accentSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(slot.timeText)
-                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(KB.text)
+                        .font(.system(.callout, weight: .semibold)).foregroundStyle(KB.text)
                     HStack(spacing: 8) {
                         if !slot.teacher.isEmpty {
                             Label(slot.teacher, systemImage: "person")
@@ -25,12 +25,12 @@ struct DaySlotRow: View {
                             Label(slot.place, systemImage: "mappin.and.ellipse")
                         }
                     }
-                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                    .font(.system(.caption)).foregroundStyle(KB.dim)
                     .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                    .font(.system(.caption)).foregroundStyle(KB.dim)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
@@ -70,7 +70,7 @@ struct DaySlotEditorView: View {
                         VStack(spacing: 0) {
                             DatePicker("上课时间", selection: $time,
                                        displayedComponents: .hourAndMinute)
-                                .font(.system(size: 15))
+                                .font(.system(.subheadline))
                                 .padding(.vertical, 10)
                             Divider()
                             FieldRow(label: "老师", text: $teacher, placeholder: "老师姓名")

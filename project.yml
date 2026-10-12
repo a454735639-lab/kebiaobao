@@ -11,7 +11,7 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "1.12.0"
+    MARKETING_VERSION: "1.13.0"
     # CURRENT_PROJECT_VERSION 由 CI 用 GitHub run_number 覆盖，保证每次构建递增
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
@@ -47,6 +47,21 @@ targets:
         SUPPORTS_MACCATALYST: "NO"
         GENERATE_INFOPLIST_FILE: "NO"
 
+  KebiaobaoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: KebiaobaoTests
+    dependencies:
+      - target: Kebiaobao
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.minis.kebiaobao.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_IDENTITY: ""
+
 schemes:
   Kebiaobao:
     build:
@@ -56,3 +71,7 @@ schemes:
       config: Debug
     archive:
       config: Release
+    test:
+      config: Debug
+      targets:
+        - KebiaobaoTests

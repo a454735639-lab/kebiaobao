@@ -22,7 +22,7 @@ struct BabyEditorView: View {
                                 FieldRow(label: "姓名", text: $name, placeholder: "如：乐橙")
                                 Divider()
                                 HStack {
-                                    Text("生日").font(.system(size: 15)).foregroundStyle(KB.text)
+                                    Text("生日").font(.system(.subheadline)).foregroundStyle(KB.text)
                                     Spacer()
                                     Toggle("", isOn: $hasBirthday).labelsHidden()
                                 }
@@ -30,7 +30,7 @@ struct BabyEditorView: View {
                                 if hasBirthday {
                                     Divider()
                                     DatePicker("选择生日", selection: $birthday, displayedComponents: .date)
-                                        .font(.system(size: 15))
+                                        .font(.system(.subheadline))
                                         .padding(.vertical, 6)
                                 }
                             }
@@ -121,7 +121,7 @@ struct CourseEditorView: View {
         HStack(spacing: 10) {
             Image(systemName: on ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(on ? KB.accent : KB.dim)
-            Text(title).font(.system(size: 15)).foregroundStyle(KB.text)
+            Text(title).font(.system(.subheadline)).foregroundStyle(KB.text)
             Spacer()
         }
         .contentShape(Rectangle())
@@ -130,30 +130,35 @@ struct CourseEditorView: View {
     private var colorRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("课程颜色").font(.system(size: 15)).foregroundStyle(KB.text)
+                Text("课程颜色").font(.system(.subheadline)).foregroundStyle(KB.text)
                 Spacer()
                 Text("用于日历、进度图配色")
-                    .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    .font(.system(.caption2)).foregroundStyle(KB.dim)
             }
-            HStack(spacing: 10) {
-                ForEach(KBPalette.colors, id: \.self) { hex in
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
+                ForEach(Array(KBPalette.colors.enumerated()), id: \.offset) { idx, hex in
                     Button {
                         colorHex = hex
                     } label: {
-                        Circle()
-                            .fill(Color.course(hex))
-                            .frame(width: 26, height: 26)
-                            .overlay(
-                                Circle().stroke(KB.text, lineWidth: colorHex == hex ? 2 : 0)
-                            )
-                            .overlay(
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .opacity(colorHex == hex ? 1 : 0)
-                            )
+                        ZStack {
+                            Circle()
+                                .fill(Color.course(hex))
+                                .frame(width: 28, height: 28)
+                                .overlay(
+                                    Circle().stroke(KB.text, lineWidth: colorHex == hex ? 2 : 0)
+                                )
+                            Image(systemName: "checkmark")
+                                .font(.system(.caption, weight: .bold))
+                                .foregroundStyle(KB.onAccent)
+                                .opacity(colorHex == hex ? 1 : 0)
+                        }
+                        // 视觉 28pt，可点区域撑到 44pt（HIG 最小触摸尺寸）
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(KBPalette.names[idx])
+                    .accessibilityAddTraits(colorHex == hex ? [.isSelected] : [])
                 }
             }
         }
@@ -179,10 +184,10 @@ struct CourseEditorView: View {
                                 if store.babies.count > 1 {
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack {
-                                            Text("所属宝贝").font(.system(size: 15)).foregroundStyle(KB.text)
+                                            Text("所属宝贝").font(.system(.subheadline)).foregroundStyle(KB.text)
                                             Spacer()
                                             Text("可多选 · 共用课时")
-                                                .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption2)).foregroundStyle(KB.dim)
                                         }
                                         ForEach(store.babies) { b in
                                             Button {
@@ -193,7 +198,7 @@ struct CourseEditorView: View {
                                                     Image(systemName: babyIDs.contains(b.id)
                                                           ? "checkmark.circle.fill" : "circle")
                                                         .foregroundStyle(babyIDs.contains(b.id) ? KB.accent : KB.dim)
-                                                    Text(b.name).font(.system(size: 15)).foregroundStyle(KB.text)
+                                                    Text(b.name).font(.system(.subheadline)).foregroundStyle(KB.text)
                                                     Spacer()
                                                 }
                                             }
@@ -209,16 +214,16 @@ struct CourseEditorView: View {
                                 Divider()
                                 if course == nil || !isPool {
                                     Toggle("这是一张年卡（课时池）", isOn: $isPool)
-                                        .font(.system(size: 15))
+                                        .font(.system(.subheadline))
                                         .padding(.vertical, 8)
                                     Divider()
                                 }
                                 DatePicker("购买时间*", selection: $purchased, displayedComponents: .date)
-                                    .font(.system(size: 15))
+                                    .font(.system(.subheadline))
                                     .padding(.vertical, 8)
                                 Divider()
                                 DatePicker("有效期至*", selection: $expiry, displayedComponents: .date)
-                                    .font(.system(size: 15))
+                                    .font(.system(.subheadline))
                                     .padding(.vertical, 8)
                                 Divider()
                                 colorRow
@@ -231,10 +236,10 @@ struct CourseEditorView: View {
                             Card {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
-                                        Text("课时从哪扣").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Text("课时从哪扣").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Text("共用一张年卡")
-                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                                     }
                                     Button {
                                         noPool = true; poolID = nil
@@ -261,10 +266,10 @@ struct CourseEditorView: View {
                             Card {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
-                                        Text("法定节假日").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Text("法定节假日").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Text(store.skipHolidays ? "全局：不上课" : "全局：照常上课")
-                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                                     }
                                     Button { holidayOverride = nil } label: {
                                         pickRow(title: "跟随全局设置", on: holidayOverride == nil)
@@ -287,7 +292,7 @@ struct CourseEditorView: View {
                             Card(padding: 0) {
                                 VStack(spacing: 0) {
                                     HStack {
-                                        Text("续费（增加课时）").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Text("续费（增加课时）").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Toggle("", isOn: $advance).labelsHidden()
                                     }
@@ -304,9 +309,9 @@ struct CourseEditorView: View {
                         }
 
                         HStack {
-                            Text("总费用：").font(.system(size: 14)).foregroundStyle(KB.dim)
+                            Text("总费用：").font(.system(.subheadline)).foregroundStyle(KB.dim)
                             Text("¥\(String(format: "%.2f", totalFee))")
-                                .font(.system(size: 17, weight: .bold)).foregroundStyle(KB.accent)
+                                .font(.system(.body, weight: .bold)).foregroundStyle(KB.accent)
                             Spacer()
                         }
                         .padding(.horizontal, 4)

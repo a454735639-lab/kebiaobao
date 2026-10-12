@@ -96,22 +96,22 @@ struct CourseDetailView: View {
                 SectionHeader(icon: "chart.pie.fill", title: shared ? "课时进度 · 共用「\(pool.name)」" : "课时进度",
                               tint: col) {
                     Text("\(used)/\(total) 节")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
                         .foregroundStyle(left <= 3 ? KB.warn : col)
                 }
                 KBProgress(value: used, total: total,
                            color: left <= 0 ? col : (left <= 3 ? KB.warn : col))
                 HStack {
                     Text("剩余 \(max(0, left)) 节")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(.caption, weight: .semibold))
                         .foregroundStyle(left <= 3 ? KB.warn : KB.text)
                     Spacer()
                     Text("剩余价值 ¥\(String(format: "%.2f", store.remainingValue(current.id)))")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                 }
                 if shared {
                     Text("本课已上 \(store.consumed(current.id)) 节 · 池内共 \(store.courses.filter { $0.poolID == pool.id && !$0.archived }.count) 门课共用")
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                 }
                 HStack(spacing: 10) {
                     KBButton(title: "续费", filled: false, tint: col) { renew = true }
@@ -140,15 +140,15 @@ struct CourseDetailView: View {
                     ForEach(attached) { c in
                         HStack {
                             Circle().fill(Color.course(c.color)).frame(width: 8, height: 8)
-                            Text(c.name).font(.system(size: 14)).foregroundStyle(KB.text)
+                            Text(c.name).font(.system(.subheadline)).foregroundStyle(KB.text)
                             Spacer()
                             Text("\(store.babyNames(c.babyIDs)) · 本课已上 \(store.consumed(c.id)) 节")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                         }
                     }
                 }
                 Text("年卡不排课，只放总课时和有效期")
-                    .font(.system(size: 11)).foregroundStyle(KB.dim)
+                    .font(.system(.caption2)).foregroundStyle(KB.dim)
             }
             .padding(.horizontal, 16)
         }
@@ -179,9 +179,9 @@ struct CourseDetailView: View {
 
     private func row(_ l: String, _ v: String) -> some View {
         HStack {
-            Text(l).font(.system(size: 14)).foregroundStyle(KB.dim)
+            Text(l).font(.system(.subheadline)).foregroundStyle(KB.dim)
             Spacer()
-            Text(v).font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
+            Text(v).font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
         }
         .padding(.vertical, 12)
     }
@@ -192,38 +192,44 @@ struct CourseDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(icon: "calendar", title: "排课")
                 if items.isEmpty {
-                    Text("暂无排课").font(.system(size: 13)).foregroundStyle(KB.dim)
+                    Text("暂无排课").font(.system(.caption)).foregroundStyle(KB.dim)
                 } else {
                     ForEach(items) { t in
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(t.orderedSlots) { s in
                                 HStack(spacing: 10) {
                                     Text(s.dayName)
-                                        .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.text)
+                                        .font(.system(.caption, weight: .medium)).foregroundStyle(KB.text)
                                     Text(s.timeText)
-                                        .font(.system(size: 13)).foregroundStyle(KB.accent)
+                                        .font(.system(.caption)).foregroundStyle(KB.accent)
                                     Spacer()
                                     Text("\(s.teacher.isEmpty ? "—" : s.teacher) · \(s.place.isEmpty ? "—" : s.place)")
-                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                        .font(.system(.caption)).foregroundStyle(KB.dim)
                                 }
                             }
                         }
                         HStack {
                             Text("每次打卡扣 \(t.deduct) 课时")
-                                .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                .font(.system(.caption2)).foregroundStyle(KB.dim)
                             Spacer()
                             Button {
                                 editingTemplate = t
                             } label: {
-                                Image(systemName: "pencil").font(.system(size: 12)).foregroundStyle(KB.accent)
+                                Image(systemName: "pencil").font(.system(.caption)).foregroundStyle(KB.accent)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("编辑排课")
                             Button {
                                 deletingTemplate = t
                             } label: {
-                                Image(systemName: "trash").font(.system(size: 12)).foregroundStyle(KB.danger)
+                                Image(systemName: "trash").font(.system(.caption)).foregroundStyle(KB.danger)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("删除排课")
                         }
                         .padding(.vertical, 4)
                     }
@@ -238,7 +244,7 @@ struct CourseDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(icon: "list.bullet.rectangle", title: "最近流水") {
                     NavigationLink("全部") { LedgerListView(courseID: current.id) }
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(.caption, weight: .medium))
                 }
                 if items.isEmpty {
                     EmptyHint(icon: "tray", title: "暂无记录")
@@ -283,9 +289,9 @@ struct RenewSheet: View {
                     let n = Int(lessons) ?? 0
                     let p = Double(price) ?? course.pricePerLesson
                     HStack {
-                        Text("本次支付：").font(.system(size: 14)).foregroundStyle(KB.dim)
+                        Text("本次支付：").font(.system(.subheadline)).foregroundStyle(KB.dim)
                         Text("¥\(String(format: "%.2f", Double(n) * p))")
-                            .font(.system(size: 17, weight: .bold)).foregroundStyle(KB.accent)
+                            .font(.system(.body, weight: .bold)).foregroundStyle(KB.accent)
                         Spacer()
                     }
                     .padding(.horizontal, 4)
@@ -332,21 +338,21 @@ struct LedgerRow: View {
             HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(store.course(entry.courseID)?.name ?? "课程")
-                    .font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
+                    .font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
                 HStack(spacing: 4) {
                     Text(KBDate.mdhm.string(from: entry.date))
-                        .font(.system(size: 11)).foregroundStyle(KB.dim)
+                        .font(.system(.caption2)).foregroundStyle(KB.dim)
                     if let who = entry.babyID, let b = store.baby(who),
                        (store.course(entry.courseID)?.babyIDs.count ?? 0) > 1 {
                         Text("· \(b.name)")
-                            .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.9))
+                            .font(.system(.caption2)).foregroundStyle(KB.accent.opacity(0.9))
                     }
                     if entry.note.isEmpty {
                         Text("加备注")
-                            .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
+                            .font(.system(.caption2)).foregroundStyle(KB.accent.opacity(0.8))
                     } else {
                         Text(entry.note)
-                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                             .lineLimit(1)
                     }
                 }
@@ -359,20 +365,20 @@ struct LedgerRow: View {
                     HStack(spacing: 6) {
                         if let s = entry.summary, !s.isEmpty {
                             Text("小结：\(s)")
-                                .font(.system(size: 11)).foregroundStyle(KB.text.opacity(0.75))
+                                .font(.system(.caption2)).foregroundStyle(KB.text.opacity(0.75))
                                 .lineLimit(2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                                 .onTapGesture { viewing = entry }
                             Button { editSummary(s) } label: {
                                 Image(systemName: "square.and.pencil")
-                                    .font(.system(size: 12))
+                                    .font(.system(.caption))
                                     .foregroundStyle(KB.accent)
                             }
                             .buttonStyle(.plain)
                         } else {
                             Text("加课后小结")
-                                .font(.system(size: 11)).foregroundStyle(KB.accent.opacity(0.8))
+                                .font(.system(.caption2)).foregroundStyle(KB.accent.opacity(0.8))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                                 .onTapGesture { editSummary("") }
@@ -383,7 +389,7 @@ struct LedgerRow: View {
             Spacer()
             if entry.kind != .leave {
                 Text("\(entry.delta > 0 ? "+" : "")\(entry.delta)节")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .foregroundStyle(entry.delta > 0 ? KB.accent : KB.danger)
             } else {
                 KBChip(text: "请假", tint: KB.warn)
@@ -392,7 +398,7 @@ struct LedgerRow: View {
                 Button {
                     store.undo(entry)
                 } label: {
-                    Text("撤销").font(.system(size: 12)).foregroundStyle(KB.danger)
+                    Text("撤销").font(.system(.caption)).foregroundStyle(KB.danger)
                 }
                 .buttonStyle(.plain)
             }
@@ -423,9 +429,9 @@ struct LedgerRow: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("\(store.course(e.courseID)?.name ?? "课程") · \(KBDate.mdhm.string(from: e.date))")
-                                .font(.system(size: 13)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                             Text(e.summary ?? "")
-                                .font(.system(size: 15)).foregroundStyle(KB.text)
+                                .font(.system(.subheadline)).foregroundStyle(KB.text)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             Color.clear.frame(height: 20)
                         }
@@ -507,9 +513,9 @@ struct LedgerListView: View {
                 }
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                     TextField("搜备注／小结／课程", text: $query)
-                        .font(.system(size: 14))
+                        .font(.system(.subheadline))
                         .textFieldStyle(.plain)
                         .autocorrectionDisabled()
                     if !query.isEmpty {
@@ -517,7 +523,7 @@ struct LedgerListView: View {
                             query = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14)).foregroundStyle(KB.dim)
+                                .font(.system(.subheadline)).foregroundStyle(KB.dim)
                         }
                         .buttonStyle(.plain)
                     }
@@ -552,7 +558,7 @@ struct LedgerListView: View {
     private func chip(_ t: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(t)
-                .font(.system(size: 13, weight: active ? .semibold : .regular))
+                .font(.system(.caption, weight: active ? .semibold : .regular))
                 .foregroundStyle(active ? KB.onAccent : KB.text)
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(active ? KB.accent : KB.card)
@@ -636,12 +642,12 @@ struct AnalyticsView: View {
                 VStack(spacing: 14) {
                     Card {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("累计支出").font(.system(size: 13)).foregroundStyle(KB.dim)
+                            Text("累计支出").font(.system(.caption)).foregroundStyle(KB.dim)
                             Text("¥\(String(format: "%.2f", totalSpent))")
-                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .font(.system(.largeTitle, design: .rounded, weight: .bold))
                                 .foregroundStyle(KB.text)
                             Text("已上课时：\(totalLessons) 节")
-                                .font(.system(size: 13)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                         }
                     }
 
@@ -658,7 +664,7 @@ struct AnalyticsView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 SectionHeader(icon: "chart.pie.fill", title: "上课进度") {
                                     Text("共 \(sliceTotal) 节")
-                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                        .font(.system(.caption)).foregroundStyle(KB.dim)
                                 }
                                 DonutChart(slices: slices, total: sliceTotal)
                                 VStack(spacing: 8) {
@@ -666,13 +672,13 @@ struct AnalyticsView: View {
                                         HStack(spacing: 8) {
                                             Circle().fill(Color.course(s.color))
                                                 .frame(width: 9, height: 9)
-                                            Text(s.name).font(.system(size: 13)).foregroundStyle(KB.text)
+                                            Text(s.name).font(.system(.caption)).foregroundStyle(KB.text)
                                             Spacer()
                                             Text("\(s.value)节")
-                                                .font(.system(size: 13, weight: .medium))
+                                                .font(.system(.caption, weight: .medium))
                                                 .foregroundStyle(KB.text)
                                             Text(pct(s.value))
-                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption)).foregroundStyle(KB.dim)
                                                 .frame(width: 46, alignment: .trailing)
                                         }
                                     }
@@ -692,7 +698,7 @@ struct AnalyticsView: View {
                                             Circle().fill(Color.course(s.color))
                                                 .frame(width: 8, height: 8)
                                             Text("\(s.name) \(s.value)")
-                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption)).foregroundStyle(KB.dim)
                                         }
                                     }
                                 }
@@ -715,20 +721,20 @@ struct AnalyticsView: View {
                                         HStack {
                                             Circle().fill(Color.course(c.color))
                                                 .frame(width: 9, height: 9)
-                                            Text(c.name).font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
+                                            Text(c.name).font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
                                             Spacer()
                                             Text(pid == nil ? "\(used)/\(pTotal)节"
                                                  : "本课 \(used) 节 · 池 \(pUsed)/\(pTotal)节")
-                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption)).foregroundStyle(KB.dim)
                                         }
                                         KBProgress(value: pUsed, total: pTotal,
                                                    color: Color.course(c.color))
                                         HStack {
                                             Text("已花费：¥\(String(format: "%.2f", sp))")
-                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption)).foregroundStyle(KB.dim)
                                             Spacer()
                                             Text("剩余价值：¥\(String(format: "%.2f", store.remainingValue(c.id)))")
-                                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                                .font(.system(.caption)).foregroundStyle(KB.dim)
                                         }
                                     }
                                     .padding(12)
@@ -757,7 +763,7 @@ struct AnalyticsView: View {
                                 }
                             }
                             if list.isEmpty {
-                                Text("暂无课程").font(.system(size: 13)).foregroundStyle(KB.dim)
+                                Text("暂无课程").font(.system(.caption)).foregroundStyle(KB.dim)
                             }
                         }
                     }
@@ -809,9 +815,9 @@ struct DonutChart: View {
             .frame(height: 180)
             VStack(spacing: 2) {
                 Text("\(total)")
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(.system(.title, design: .rounded, weight: .bold))
                     .foregroundStyle(KB.text)
-                Text("总课时").font(.system(size: 11)).foregroundStyle(KB.dim)
+                Text("总课时").font(.system(.caption2)).foregroundStyle(KB.dim)
             }
         }
     }

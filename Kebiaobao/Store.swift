@@ -84,8 +84,13 @@ final class Store: ObservableObject {
     }
 
     private var dir: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        // ponytail: 测试注入临时目录；正式运行走 Documents。要换 App Group 容器时改这里
+        Store.overrideDir
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
+
+    /// 仅测试用：指定数据目录，隔离真实 Documents
+    static var overrideDir: URL?
 
     private var fileURL: URL { dir.appendingPathComponent("kebiaobao.json") }
 
@@ -334,7 +339,7 @@ final class Store: ObservableObject {
     // MARK: - 变更
 
     /// 打卡结果
-    enum CheckInResult { case ok, duplicate, expired }
+    enum CheckInResult: Equatable { case ok, duplicate, expired }
 
     /// 课程是否已过期（按天比较，当天仍可上课）
     func isExpired(_ courseID: UUID) -> Bool {
@@ -389,13 +394,21 @@ final class Store: ObservableObject {
     /// 手动记账：打卡扣课时 / 请假 / 加课时。独立于排课，可自选日期与课时数。
     enum ManualOp: Hashable { case consume, leave, charge }
 
+    @discardableResult
     func recordManual(_ op: ManualOp, courseID: UUID, lessons: Int, date: Date,
-                      note: String, price: Double, babyID: UUID? = nil) {
+                      note: String, price: Double, babyID: UUID? = nil) -> CheckInResult {
         let n = max(1, lessons)
         let memo = note.isEmpty ? Self.manualDefaultNote(op) : note
         let who = babyID ?? course(courseID)?.babyIDs.first
         switch op {
         case .consume:
+            if isExpired(courseID) { return .expired }
+            // 与排课打卡同一规则：同一天同课程同宝宝已有打卡就不重复扣
+            let dup = ledger.contains {
+                $0.courseID == courseID && $0.kind == .consume &&
+                $0.babyID == who && KBDate.isSameDay($0.date, date)
+            }
+            if dup { return .duplicate }
             ledger.append(LedgerEntry(courseID: courseID, date: date, delta: -n,
                                       kind: .consume, note: memo,
                                       unitPrice: pool(of: courseID)?.pricePerLesson
@@ -407,7 +420,7 @@ final class Store: ObservableObject {
         case .charge:
             // 课时加到池子上（挂年卡的课共享一张卡）
             let target = course(courseID)?.poolID ?? courseID
-            guard let i = courses.firstIndex(where: { $0.id == target }) else { return }
+            guard let i = courses.firstIndex(where: { $0.id == target }) else { return .ok }
             let unit = price > 0 ? price : courses[i].pricePerLesson
             let prev = price > 0 ? courses[i].pricePerLesson : nil
             courses[i].total += n
@@ -417,6 +430,7 @@ final class Store: ObservableObject {
                                       prevPrice: prev, babyID: who))
         }
         save()
+        return .ok
     }
 
     /// 补填最后一条流水的备注与课后小结（打卡弹窗用）

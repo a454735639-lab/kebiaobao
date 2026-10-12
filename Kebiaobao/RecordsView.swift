@@ -8,6 +8,17 @@ struct RecordsView: View {
         case lesson = "课时记录"
         case payment = "缴费记录"
         case checkIn = "打卡记录"
+        case all = "全部记录"
+
+        /// 这个 tab 收哪些流水类型；nil = 全收
+        var kinds: Set<RecordKind>? {
+            switch self {
+            case .lesson: return [.consume, .leave]
+            case .payment: return [.charge, .refund]
+            case .checkIn: return [.consume]
+            case .all: return nil
+            }
+        }
     }
 
     @State private var tab: Tab = .lesson
@@ -34,14 +45,11 @@ struct RecordsView: View {
     }
 
     private var items: [LedgerEntry] {
-        switch tab {
-        case .lesson:
-            return scoped.filter { $0.kind == .consume || $0.kind == .leave }.filter(matches)
-        case .payment:
-            return scoped.filter { $0.kind == .charge || $0.kind == .refund }.filter(matches)
-        case .checkIn:
-            return scoped.filter(matches)
+        scoped.filter { e in
+            guard let kinds = tab.kinds else { return true }
+            return kinds.contains(e.kind)
         }
+        .filter(matches)
     }
 
     private var courses: [Course] { store.courses(for: store.scope) }
@@ -72,14 +80,14 @@ struct RecordsView: View {
 
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                     TextField("搜备注／小结／课程", text: $query)
-                        .font(.system(size: 14)).textFieldStyle(.plain)
+                        .font(.system(.subheadline)).textFieldStyle(.plain)
                         .autocorrectionDisabled()
                     if !query.isEmpty {
                         Button { query = "" } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14)).foregroundStyle(KB.dim)
+                                .font(.system(.subheadline)).foregroundStyle(KB.dim)
                         }
                         .buttonStyle(.plain)
                     }
@@ -93,11 +101,11 @@ struct RecordsView: View {
 
                 HStack {
                     Text("共 \(items.count) 条")
-                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                     Spacer()
                     if tab == .checkIn {
                         let days = Set(items.map { KBDate.ymd.string(from: $0.date) }).count
-                        Text("\(days) 天").font(.system(size: 12)).foregroundStyle(KB.dim)
+                        Text("\(days) 天").font(.system(.caption)).foregroundStyle(KB.dim)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -139,11 +147,11 @@ struct RecordsView: View {
                         HStack {
                             IconBadge(icon: "calendar", size: 22)
                             Text(dayLabel(k))
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(.caption, weight: .semibold))
                                 .foregroundStyle(KB.text)
                             Spacer()
                             Text("\(dayItems.count) 条")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 10)
                         .background(KB.bg)
@@ -172,7 +180,7 @@ struct RecordsView: View {
                       action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(t)
-                .font(.system(size: 13, weight: active ? .semibold : .regular))
+                .font(.system(.caption, weight: active ? .semibold : .regular))
                 .foregroundStyle(active ? KB.onAccent : KB.text)
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(active ? color : KB.card)

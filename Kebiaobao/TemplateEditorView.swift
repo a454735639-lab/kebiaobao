@@ -61,12 +61,12 @@ struct TemplateEditorView: View {
                                     }
                                 } label: {
                                     HStack {
-                                        Text("选择课程*").font(.system(size: 15)).foregroundStyle(KB.text)
+                                        Text("选择课程*").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Text(store.course(selectedCourse ?? UUID())?.name ?? "请选择")
-                                            .font(.system(size: 15)).foregroundStyle(KB.dim)
+                                            .font(.system(.subheadline)).foregroundStyle(KB.dim)
                                         Image(systemName: "chevron.up.chevron.down")
-                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                                     }
                                     .padding(.vertical, 13)
                                 }
@@ -78,17 +78,17 @@ struct TemplateEditorView: View {
                             Card {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
-                                        Text("这节课算谁的").font(.system(size: 14)).foregroundStyle(KB.text)
+                                        Text("这节课算谁的").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Text("共用课时 · 按归属记账")
-                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                                     }
                                     HStack(spacing: 8) {
                                         ForEach(ownerOptions) { b in
                                             let on = (ownerBabyID ?? ownerOptions.first?.id) == b.id
                                             Button { ownerBabyID = b.id } label: {
                                                 Text(b.name)
-                                                    .font(.system(size: 14, weight: .medium))
+                                                    .font(.system(.subheadline, weight: .medium))
                                                     .foregroundStyle(on ? KB.onAccent : KB.text)
                                                     .frame(maxWidth: .infinity)
                                                     .frame(height: 36)
@@ -105,7 +105,7 @@ struct TemplateEditorView: View {
                         Card {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("星期*（可多选，选完逐天设置时间／老师）")
-                                    .font(.system(size: 14)).foregroundStyle(KB.text)
+                                    .font(.system(.subheadline)).foregroundStyle(KB.text)
                                 HStack(spacing: 6) {
                                     ForEach(1...7, id: \.self) { w in
                                         let on = weekdays.contains(w)
@@ -118,7 +118,7 @@ struct TemplateEditorView: View {
                                             }
                                         } label: {
                                             Text(KBDate.weekdayName(w).replacingOccurrences(of: "周", with: ""))
-                                                .font(.system(size: 14, weight: .medium))
+                                                .font(.system(.subheadline, weight: .medium))
                                                 .foregroundStyle(on ? KB.onAccent : KB.text)
                                                 .frame(maxWidth: .infinity)
                                                 .frame(height: 36)
@@ -134,7 +134,7 @@ struct TemplateEditorView: View {
                         if !weekdays.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("各天安排（点开单独设置）")
-                                    .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                                    .font(.system(.caption, weight: .medium)).foregroundStyle(KB.dim)
                                     .padding(.leading, 4)
                                 Card(padding: 0) {
                                     VStack(spacing: 0) {
@@ -148,13 +148,13 @@ struct TemplateEditorView: View {
 
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("未单独设置的天，沿用下面的默认值")
-                                    .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
+                                    .font(.system(.caption, weight: .medium)).foregroundStyle(KB.dim)
                                     .padding(.leading, 4)
                                 Card(padding: 0) {
                                     VStack(spacing: 0) {
                                         DatePicker("默认时间", selection: $defaultTime,
                                                    displayedComponents: .hourAndMinute)
-                                            .font(.system(size: 15)).padding(.vertical, 10)
+                                            .font(.system(.subheadline)).padding(.vertical, 10)
                                         Divider()
                                         FieldRow(label: "默认老师", text: $defaultTeacher,
                                                  placeholder: "老师姓名")
@@ -170,17 +170,17 @@ struct TemplateEditorView: View {
                         Card(padding: 0) {
                             VStack(spacing: 0) {
                                 HStack {
-                                    Text("每次打卡扣课时").font(.system(size: 15)).foregroundStyle(KB.text)
+                                    Text("每次打卡扣课时").font(.system(.subheadline)).foregroundStyle(KB.text)
                                     Spacer()
                                     Stepper("", value: $deduct, in: 1...10).labelsHidden()
                                     Text("\(deduct) 课时")
-                                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.accent)
+                                        .font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.accent)
                                         .frame(width: 64, alignment: .trailing)
                                 }
                                 .padding(.vertical, 10)
                                 Divider()
                                 HStack {
-                                    Text("提前提醒").font(.system(size: 15)).foregroundStyle(KB.text)
+                                    Text("提前提醒").font(.system(.subheadline)).foregroundStyle(KB.text)
                                     Spacer()
                                     Picker("", selection: $remind) {
                                         Text("不提醒").tag(0)

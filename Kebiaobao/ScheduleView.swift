@@ -43,7 +43,7 @@ struct ScheduleView: View {
             .safeAreaInset(edge: .top) {
                 HStack {
                     Text("课表日程")
-                        .font(.system(size: 24, weight: .bold)).foregroundStyle(KB.text)
+                        .font(.system(.title2, weight: .bold)).foregroundStyle(KB.text)
                     Spacer()
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
@@ -51,7 +51,7 @@ struct ScheduleView: View {
                         }
                     } label: {
                         Text(mode == .week ? "月" : "周")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(.subheadline, weight: .semibold))
                             .foregroundStyle(KB.accent)
                             .frame(width: 34, height: 34)
                             .background(KB.accentSoft).clipShape(Circle())
@@ -59,7 +59,7 @@ struct ScheduleView: View {
                     .buttonStyle(.plain)
                     Button { addSheet = true } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(.callout, weight: .semibold))
                             .foregroundStyle(KB.onAccent)
                             .frame(width: 34, height: 34)
                             .background(KB.accent).clipShape(Circle())
@@ -97,14 +97,14 @@ struct ScheduleView: View {
             HStack {
                 Button { shift(-1) } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.text)
+                        .font(.system(.caption, weight: .semibold)).foregroundStyle(KB.text)
                 }
                 Text(weekTitle)
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    .font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
                     .frame(maxWidth: .infinity)
                 Button { shift(1) } label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.text)
+                        .font(.system(.caption, weight: .semibold)).foregroundStyle(KB.text)
                 }
             }
             .padding(.horizontal, 4)
@@ -135,17 +135,17 @@ struct ScheduleView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Text("\(KBDate.weekdayName(wd)) \(df.string(from: d))")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(.subheadline, weight: .semibold))
                         .foregroundStyle(isToday ? KB.accent : KB.text)
                     if isToday {
                         Text("今天")
-                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(KB.onAccent)
+                            .font(.system(.caption2, weight: .semibold)).foregroundStyle(KB.onAccent)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(KB.accent).clipShape(Capsule())
                     }
                     if let label = Holiday.label(d) {
                         Text(label)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(.caption2, weight: .semibold))
                             .foregroundStyle(Holiday.isHoliday(d) ? KB.danger : KB.warn)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background((Holiday.isHoliday(d) ? KB.danger : KB.warn).opacity(0.12))
@@ -156,9 +156,9 @@ struct ScheduleView: View {
                 if items.isEmpty {
                     HStack(spacing: 6) {
                         Image(systemName: store.isSkipped(d) ? "calendar.badge.exclamationmark" : "calendar")
-                            .font(.system(size: 12)).foregroundStyle(KB.dim)
+                            .font(.system(.caption)).foregroundStyle(KB.dim)
                         Text(store.isSkipped(d) ? "法定节假日，不排课" : "暂无排课")
-                            .font(.system(size: 13)).foregroundStyle(KB.dim)
+                            .font(.system(.caption)).foregroundStyle(KB.dim)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
@@ -183,20 +183,20 @@ struct ScheduleView: View {
             VStack(spacing: 12) {
                 HStack {
                     Button { shift(-1) } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "chevron.left").font(.system(.caption, weight: .semibold))
                             .foregroundStyle(KB.text)
                     }
                     Text(monthTitle)
-                        .font(.system(size: 16, weight: .semibold)).foregroundStyle(KB.text)
+                        .font(.system(.callout, weight: .semibold)).foregroundStyle(KB.text)
                         .frame(maxWidth: .infinity)
                     Button { shift(1) } label: {
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.system(.caption, weight: .semibold))
                             .foregroundStyle(KB.text)
                     }
                 }
                 HStack(spacing: 0) {
                     ForEach(["一", "二", "三", "四", "五", "六", "日"], id: \.self) { w in
-                        Text(w).font(.system(size: 12)).foregroundStyle(KB.dim)
+                        Text(w).font(.system(.caption)).foregroundStyle(KB.dim)
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -257,7 +257,7 @@ struct ScheduleView: View {
             Button { selected = d } label: {
                 VStack(spacing: 1) {
                     Text("\(cal.component(.day, from: d))")
-                        .font(.system(size: 13, weight: isSel || isToday ? .semibold : .regular))
+                        .font(.system(.caption, weight: isSel || isToday ? .semibold : .regular))
                         .foregroundStyle(isSel ? KB.onAccent : (isToday ? KB.accent : KB.text))
                         .frame(width: 24, height: 24)
                         .background(isSel ? KB.accent : Color.clear)
@@ -265,17 +265,17 @@ struct ScheduleView: View {
                     // 农历 / 节气 / 休班，优先级：节日/补班 > 节气 > 农历初一 > 农历日
                     if let badge = Holiday.badge(d) {
                         Text(badge)
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Color(hex: Holiday.isHoliday(d) ? 0xE06A6A : 0xC9A24D))
+                            .font(.system(.caption2, weight: .semibold))
+                            .foregroundStyle(Holiday.isHoliday(d) ? KB.holidayRed : KB.makeupGold)
                             .lineLimit(1)
                     } else if let term {
                         Text(term)
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Color(hex: 0x5F8FD0))
+                            .font(.system(.caption2, weight: .semibold))
+                            .foregroundStyle(KB.termBlue)
                             .lineLimit(1)
                     } else if let lunar {
                         Text(lunar.day == 1 ? lunar.monthName + "月" : lunar.dayName)
-                            .font(.system(size: 8))
+                            .font(.system(.caption2))
                             .foregroundStyle(KB.dim)
                             .lineLimit(1)
                     }
@@ -284,10 +284,10 @@ struct ScheduleView: View {
                         let c = store.course(t.courseID)
                         let col = Color.course(c?.color ?? KBPalette.colors[0])
                         VStack(spacing: 0) {
-                            Text(s.timeText).font(.system(size: 8, weight: .semibold))
+                            Text(s.timeText).font(.system(.caption2, weight: .semibold))
                                 .foregroundStyle(col)
                             Text(s.teacher.isEmpty ? (c?.name ?? "") : s.teacher)
-                                .font(.system(size: 8)).foregroundStyle(KB.dim)
+                                .font(.system(.caption2)).foregroundStyle(KB.dim)
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity)
@@ -296,18 +296,18 @@ struct ScheduleView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     }
                     if items.count > 2 {
-                        Text("+\(items.count - 2)").font(.system(size: 8)).foregroundStyle(KB.dim)
+                        Text("+\(items.count - 2)").font(.system(.caption2)).foregroundStyle(KB.dim)
                     }
                     Spacer(minLength: 0)
                 }
-                .frame(height: 74, alignment: .top)
+                .frame(minHeight: 74, alignment: .top)
                 .frame(maxWidth: .infinity)
                 .background(isSel ? KB.accentSoft.opacity(0.5) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(.plain)
         } else {
-            Color.clear.frame(height: 74)
+            Color.clear.frame(minHeight: 74)
         }
     }
 
@@ -320,23 +320,23 @@ struct ScheduleView: View {
         return HStack(spacing: 12) {
             VStack(spacing: 3) {
                 Text(s.timeText)
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(col)
-                Text("\(t.deduct)节").font(.system(size: 10)).foregroundStyle(KB.dim)
+                    .font(.system(.caption, weight: .semibold)).foregroundStyle(col)
+                Text("\(t.deduct)节").font(.system(.caption2)).foregroundStyle(KB.dim)
             }
-            .frame(width: 52)
+            .frame(minWidth: 52)
             VStack(alignment: .leading, spacing: 3) {
                 Text(c?.name ?? "课程")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                    .font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
                 Text([s.teacher, s.place].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                    .font(.system(.caption)).foregroundStyle(KB.dim)
             }
             Spacer()
             Button { selected = day; sheet = .checkIn(t) } label: {
                 Text("打卡")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(.caption, weight: .semibold))
                     .foregroundStyle(KB.onAccent)
                     .padding(.horizontal, 13).padding(.vertical, 6)
-                    .background(LinearGradient(colors: [col.opacity(0.86), col],
+                    .background(LinearGradient(colors: [col.brightness(-0.06), col],
                                                startPoint: .top, endPoint: .bottom))
                     .clipShape(Capsule())
             }
@@ -370,7 +370,12 @@ struct ManualEntryEditorView: View {
     @State private var showPicker = false
     /// 共用年卡：这条记录算在哪个宝宝头上
     @State private var ownerBabyID: UUID?
-    @State private var expiredAlert = false
+    @State private var alert: AlertKind?
+
+    private enum AlertKind: Identifiable {
+        case duplicate, expired
+        var id: Int { self == .duplicate ? 0 : 1 }
+    }
 
     /// 已选课程挂在多个宝贝下时才需要选归属
     private var ownerOptions: [Baby] {
@@ -397,14 +402,14 @@ struct ManualEntryEditorView: View {
                         Card {
                             Button { showPicker = true } label: {
                                 HStack {
-                                    Text("选择课程").font(.system(size: 15))
+                                    Text("选择课程").font(.system(.subheadline))
                                         .foregroundStyle(courseID == nil ? KB.dim : KB.text)
                                     Spacer()
                                     if let id = courseID {
                                         Text(store.course(id)?.name ?? "—")
-                                            .font(.system(size: 15, weight: .medium))
+                                            .font(.system(.subheadline, weight: .medium))
                                     }
-                                    Image(systemName: "chevron.right").font(.system(size: 12))
+                                    Image(systemName: "chevron.right").font(.system(.caption))
                                         .foregroundStyle(KB.dim)
                                 }
                                 .padding(.vertical, 11)
@@ -415,17 +420,17 @@ struct ManualEntryEditorView: View {
                             Card {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack {
-                                        Text("记在谁头上").font(.system(size: 14)).foregroundStyle(KB.text)
+                                        Text("记在谁头上").font(.system(.subheadline)).foregroundStyle(KB.text)
                                         Spacer()
                                         Text("共用课时")
-                                            .font(.system(size: 11)).foregroundStyle(KB.dim)
+                                            .font(.system(.caption2)).foregroundStyle(KB.dim)
                                     }
                                     HStack(spacing: 8) {
                                         ForEach(ownerOptions) { b in
                                             let on = (ownerBabyID ?? ownerOptions.first?.id) == b.id
                                             Button { ownerBabyID = b.id } label: {
                                                 Text(b.name)
-                                                    .font(.system(size: 14, weight: .medium))
+                                                    .font(.system(.subheadline, weight: .medium))
                                                     .foregroundStyle(on ? KB.onAccent : KB.text)
                                                     .frame(maxWidth: .infinity)
                                                     .frame(height: 36)
@@ -440,22 +445,22 @@ struct ManualEntryEditorView: View {
                         }
                         Card {
                             HStack(alignment: .center) {
-                                Text("课时数").font(.system(size: 15))
+                                Text("课时数").font(.system(.subheadline))
                                 Spacer()
                                 HStack(spacing: 14) {
                                     stepBtn("minus", -1)
                                     TextField("1", text: $lessonsText)
                                         .keyboardType(.numberPad)
-                                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                                        .font(.system(.title3, design: .rounded, weight: .bold))
                                         .multilineTextAlignment(.center)
-                                        .frame(width: 56)
+                                        .frame(minWidth: 56)
                                     stepBtn("plus", 1)
                                 }
                             }
                         }
                         Card {
                             HStack {
-                                Text("日期").font(.system(size: 15))
+                                Text("日期").font(.system(.subheadline))
                                 Spacer()
                                 DatePicker("", selection: $date, displayedComponents: .date)
                                     .labelsHidden()
@@ -464,25 +469,25 @@ struct ManualEntryEditorView: View {
                         if op == .charge {
                             Card {
                                 HStack {
-                                    Text("单价").font(.system(size: 15))
+                                    Text("单价").font(.system(.subheadline))
                                     Spacer()
                                     HStack(spacing: 6) {
                                         Image(systemName: "yensign").foregroundStyle(KB.dim)
                                         TextField("沿用原单价", text: $price)
                                             .keyboardType(.decimalPad)
-                                            .font(.system(size: 15))
+                                            .font(.system(.subheadline))
                                             .multilineTextAlignment(.trailing)
                                     }
-                                    .frame(width: 130)
+                                    .frame(minWidth: 130)
                                 }
                             }
                         }
                         Card {
                             HStack(alignment: .top) {
-                                Text("备注").font(.system(size: 15))
+                                Text("备注").font(.system(.subheadline))
                                 Spacer()
                                 TextField(Store.manualDefaultNote(op), text: $note)
-                                    .font(.system(size: 15))
+                                    .font(.system(.subheadline))
                                     .multilineTextAlignment(.trailing)
                                     .frame(maxWidth: 200)
                             }
@@ -495,7 +500,7 @@ struct ManualEntryEditorView: View {
                 }
                 if let id = courseID {
                     Text(currentCourseText)
-                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 4)
                 }
@@ -504,12 +509,12 @@ struct ManualEntryEditorView: View {
                 HStack {
                     Button { dismiss(); onDone() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(.callout, weight: .semibold))
                             .foregroundStyle(KB.dim)
                             .frame(width: 32, height: 32)
                     }
                     Spacer()
-                    Text("手动记账").font(.system(size: 17, weight: .bold)).foregroundStyle(KB.text)
+                    Text("手动记账").font(.system(.body, weight: .bold)).foregroundStyle(KB.text)
                     Spacer()
                     Color.clear.frame(width: 32, height: 32)
                 }
@@ -526,10 +531,17 @@ struct ManualEntryEditorView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .alert("课程已过期", isPresented: $expiredAlert) {
-                Button("好") { }
-            } message: {
-                Text("这门课的有效期已过，不能再打卡。要续期请到课程编辑里改「有效期至」。")
+            .alert(item: $alert) { kind in
+                switch kind {
+                case .duplicate:
+                    return Alert(title: Text("这一天已经打过卡"),
+                                 message: Text("这门课在这天已有打卡记录。如需调整，请到课时流水里撤销或改备注。"),
+                                 dismissButton: .default(Text("好")))
+                case .expired:
+                    return Alert(title: Text("课程已过期"),
+                                 message: Text("这门课的有效期已过，不能再打卡。要续期请到课程编辑里改「有效期至」。"),
+                                 dismissButton: .default(Text("好")))
+                }
             }
             .sheet(isPresented: $showPicker) { coursePicker }
         }
@@ -541,7 +553,7 @@ struct ManualEntryEditorView: View {
             lessonsText = String(n)
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(.subheadline, weight: .semibold))
                 .foregroundStyle(KB.text)
                 .frame(width: 34, height: 34)
                 .background(KB.accentSoft)
@@ -554,7 +566,7 @@ struct ManualEntryEditorView: View {
         let sel = op == op2
         return Button { op = op2 } label: {
             Text(title)
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(.subheadline, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
                 .foregroundStyle(sel ? KB.onAccent : KB.text)
@@ -586,14 +598,14 @@ struct ManualEntryEditorView: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(c.name).font(.system(size: 15, weight: .medium))
+                                    Text(c.name).font(.system(.subheadline, weight: .medium))
                                     Text("\(store.remaining(c))/\(store.pool(of: c.id)?.total ?? c.total) 节 · \(c.tag)")
-                                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                        .font(.system(.caption)).foregroundStyle(KB.dim)
                                 }
                                 Spacer()
                                 if courseID == c.id {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(.subheadline, weight: .bold))
                                         .foregroundStyle(KB.accent)
                                 }
                             }
@@ -605,10 +617,10 @@ struct ManualEntryEditorView: View {
             .safeAreaInset(edge: .top) {
                 HStack {
                     Spacer()
-                    Text("选择课程").font(.system(size: 17, weight: .bold)).foregroundStyle(KB.text)
+                    Text("选择课程").font(.system(.body, weight: .bold)).foregroundStyle(KB.text)
                     Spacer()
                     Button("关闭") { showPicker = false }
-                        .font(.system(size: 15)).foregroundStyle(KB.dim)
+                        .font(.system(.subheadline)).foregroundStyle(KB.dim)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -626,16 +638,19 @@ struct ManualEntryEditorView: View {
 
     private func save() {
         guard let id = courseID else { return }
-        // 到期课程禁止再打卡（与排课打卡同一规则）；请假/加课时不受限
-        if op == .consume && store.isExpired(id) { expiredAlert = true; return }
         let opts = ownerOptions
         let who = opts.isEmpty ? nil : (ownerBabyID.flatMap { p in opts.contains { $0.id == p } ? p : nil } ?? opts.first?.id)
-        store.recordManual(op, courseID: id,
-                           lessons: max(1, Int(lessonsText) ?? 1),
-                           date: date,
-                           note: note, price: Double(price.replacingOccurrences(of: ",", with: ".")) ?? 0,
-                           babyID: who)
-        dismiss(); onDone()
+        // 到期禁止打卡、同日重复扣课，都在 Store 里判，跟排课打卡同一套规则
+        switch store.recordManual(op, courseID: id,
+                                  lessons: max(1, Int(lessonsText) ?? 1),
+                                  date: date,
+                                  note: note, price: Double(price.replacingOccurrences(of: ",", with: ".")) ?? 0,
+                                  babyID: who) {
+        case .ok:
+            dismiss(); onDone()
+        case .duplicate: alert = .duplicate
+        case .expired: alert = .expired
+        }
     }
 }
 
@@ -667,17 +682,17 @@ struct CheckInSheet: View {
                         IconBadge(icon: "checkmark.circle.fill", tint: col, size: 40)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(cur?.name ?? "课程")
-                                .font(.system(size: 18, weight: .bold)).foregroundStyle(KB.text)
+                                .font(.system(.title3, weight: .bold)).foregroundStyle(KB.text)
                             Text("\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                         }
                         Spacer()
                         if let cur {
                             VStack(spacing: 1) {
                                 Text("\(store.remaining(cur))")
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .font(.system(.title2, design: .rounded, weight: .bold))
                                     .foregroundStyle(store.remaining(cur) <= 3 ? KB.warn : col)
-                                Text("剩余").font(.system(size: 10)).foregroundStyle(KB.dim)
+                                Text("剩余").font(.system(.caption2)).foregroundStyle(KB.dim)
                             }
                         }
                     }
@@ -693,7 +708,7 @@ struct CheckInSheet: View {
                         VStack(spacing: 0) {
                             SectionHeader(icon: "minus.circle.fill", title: "本次打卡", tint: col) {
                                 Text("扣 \(deduct) 课时")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(.system(.caption, design: .rounded, weight: .bold))
                                     .foregroundStyle(col)
                             }
                             HStack {
@@ -710,7 +725,7 @@ struct CheckInSheet: View {
                         VStack(alignment: .leading, spacing: 10) {
                             SectionHeader(icon: "text.bubble.fill", title: "课后小结")
                             TextField("本节学了什么、表现如何", text: $summary, axis: .vertical)
-                                .font(.system(size: 14))
+                                .font(.system(.subheadline))
                                 .lineLimit(3...6)
                                 .textFieldStyle(.plain)
                                 .padding(10)

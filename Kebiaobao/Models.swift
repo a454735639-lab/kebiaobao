@@ -128,6 +128,9 @@ enum KBPalette {
         0xC97B6A,  // 砖红
     ]
 
+    /// 无障碍朗读用（跟 colors 同序）
+    static let names = ["草绿", "紫", "橙", "蓝", "玫红", "青", "金", "淡紫", "墨绿", "砖红"]
+
     /// 同 id 永远同色（UUID 前 8 字节哈希，跨启动稳定）
     static func forID(_ id: UUID) -> UInt32 {
         let b = id.uuid

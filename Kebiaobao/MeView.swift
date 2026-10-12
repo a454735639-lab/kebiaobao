@@ -154,9 +154,9 @@ struct MeView: View {
                         }
                         group("关于") {
                             HStack {
-                                Text("版本").font(.system(size: 14)).foregroundStyle(KB.dim)
+                                Text("版本").font(.system(.subheadline)).foregroundStyle(KB.dim)
                                 Spacer()
-                                Text(appVersion).font(.system(size: 14)).foregroundStyle(KB.text)
+                                Text(appVersion).font(.system(.subheadline)).foregroundStyle(KB.text)
                             }
                             .padding(.vertical, 4)
                         }
@@ -169,7 +169,7 @@ struct MeView: View {
             .safeAreaInset(edge: .top) {
                 HStack {
                     Text("我的")
-                        .font(.system(size: 28, weight: .bold)).foregroundStyle(KB.text)
+                        .font(.system(.title, weight: .bold)).foregroundStyle(KB.text)
                     Spacer()
                 }
                 .padding(.horizontal, 20).padding(.vertical, 10)
@@ -222,9 +222,9 @@ struct MeView: View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
                 Label("本地数据读取失败", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.danger)
+                    .font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.danger)
                 Text("原文件已另存为 kebiaobao.bad.json。为避免覆盖，本次启动不再写入任何改动。")
-                    .font(.system(size: 12)).foregroundStyle(KB.dim)
+                    .font(.system(.caption)).foregroundStyle(KB.dim)
                 if store.hasBackup {
                     KBButton(title: "从备份恢复", icon: "arrow.counterclockwise") {
                         do { try store.restoreBackup(); toast = "已从备份恢复" }
@@ -232,7 +232,7 @@ struct MeView: View {
                     }
                 } else {
                     Text("没有可用备份，请通过「导入 Excel」重建数据。")
-                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                 }
             }
         }
@@ -250,25 +250,28 @@ struct MeView: View {
                 ZStack {
                     Circle().fill(KB.accentGradient).frame(width: 54, height: 54)
                     Text(String(store.currentBaby?.name.prefix(1) ?? "宝"))
-                        .font(.system(size: 22, weight: .bold)).foregroundStyle(KB.onAccent)
+                        .font(.system(.title2, weight: .bold)).foregroundStyle(KB.onAccent)
                 }
                 .shadow(color: KB.accent.opacity(0.28), radius: 7, x: 0, y: 4)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(store.currentBaby?.name ?? "宝贝")
-                        .font(.system(size: 18, weight: .bold)).foregroundStyle(KB.text)
+                        .font(.system(.title3, weight: .bold)).foregroundStyle(KB.text)
                     if let bd = store.currentBaby?.birthday {
                         Text("生日 \(KBDate.cnFull.string(from: bd))")
-                            .font(.system(size: 12)).foregroundStyle(KB.dim)
+                            .font(.system(.caption)).foregroundStyle(KB.dim)
                     } else {
-                        Text("未设置生日").font(.system(size: 12)).foregroundStyle(KB.dim)
+                        Text("未设置生日").font(.system(.caption)).foregroundStyle(KB.dim)
                     }
                 }
                 Spacer()
                 NavigationLink { BabyManageView() } label: {
                     Image(systemName: "pencil")
-                        .font(.system(size: 14)).foregroundStyle(KB.dim)
+                        .font(.system(.subheadline)).foregroundStyle(KB.dim)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("宝贝管理")
             }
         }
     }
@@ -293,11 +296,11 @@ struct MeView: View {
     private func heroStat(_ value: String, _ label: String, warn: Bool = false) -> some View {
         VStack(spacing: 5) {
             Text(value)
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(warn ? Color(hex: 0xFFE7B0) : KB.onAccent)
+                .font(.system(.title, design: .rounded, weight: .bold))
+                .foregroundStyle(warn ? KB.onAccentWarn : KB.onAccent)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(KB.onAccent.opacity(0.82))
+                .font(.system(.caption2, weight: .medium))
+                .foregroundStyle(KB.onAccent.opacity(0.92))
         }
         .frame(maxWidth: .infinity)
     }
@@ -311,10 +314,10 @@ struct MeView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: groupIcon(title))
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(.caption2, weight: .semibold))
                     .foregroundStyle(KB.accent.opacity(0.8))
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.dim)
+                    .font(.system(.caption, weight: .semibold)).foregroundStyle(KB.dim)
             }
             .padding(.leading, 4)
             Card(padding: 0) {
@@ -339,15 +342,15 @@ struct MeView: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 15)).foregroundStyle(KB.accent)
-                    .frame(width: 26)
+                    .font(.system(.subheadline)).foregroundStyle(KB.accent)
+                    .frame(minWidth: 26)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
+                    Text(title).font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
+                    Text(sub).font(.system(.caption2)).foregroundStyle(KB.dim)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(KB.line)
+                    .font(.system(.caption, weight: .semibold)).foregroundStyle(KB.line)
             }
             .padding(.horizontal, 16).padding(.vertical, 13)
         }
@@ -359,11 +362,11 @@ struct MeView: View {
                            isOn: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15)).foregroundStyle(KB.accent)
-                .frame(width: 26)
+                .font(.system(.subheadline)).foregroundStyle(KB.accent)
+                .frame(minWidth: 26)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
+                Text(title).font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
+                Text(sub).font(.system(.caption2)).foregroundStyle(KB.dim)
             }
             Spacer()
             Toggle("", isOn: isOn).labelsHidden().tint(KB.accent)
@@ -386,12 +389,12 @@ struct MeView: View {
             HStack(spacing: 12) {
                 IconBadge(icon: icon, size: 30)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
+                    Text(title).font(.system(.subheadline, weight: .medium)).foregroundStyle(KB.text)
+                    Text(sub).font(.system(.caption2)).foregroundStyle(KB.dim)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(KB.line)
+                    .font(.system(.caption, weight: .semibold)).foregroundStyle(KB.line)
             }
             .padding(.horizontal, 16).padding(.vertical, 13)
         }
@@ -413,7 +416,7 @@ struct MeView: View {
                 KB.bg.ignoresSafeArea()
                 VStack(spacing: 14) {
                     Text("选择导出的 .xlsx 文件，导入后覆盖当前全部数据")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .font(.system(.caption)).foregroundStyle(KB.dim)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     KBButton(title: "选择 Excel 文件", icon: "folder") { showPicker = true }
                 }
@@ -456,12 +459,12 @@ struct MeView: View {
                 VStack(spacing: 14) {
                     Card {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("即将导入").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                            Text(p.summary).font(.system(size: 14)).foregroundStyle(KB.text)
+                            Text("即将导入").font(.system(.subheadline, weight: .semibold)).foregroundStyle(KB.text)
+                            Text(p.summary).font(.system(.subheadline)).foregroundStyle(KB.text)
                             Text("当前数据：宝贝 \(store.babies.count) · 课程 \(store.courses.count) · 流水 \(store.ledger.count)")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                             Text("覆盖前会自动备份当前数据，可在「我的 → 备份与恢复」里恢复。")
-                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                                .font(.system(.caption)).foregroundStyle(KB.dim)
                         }
                     }
                     KBButton(title: "确认覆盖导入", icon: "exclamationmark.triangle.fill") {
