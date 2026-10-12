@@ -282,7 +282,8 @@ struct ScheduleView: View {
                     ForEach(items.prefix(2)) { t in
                         let s = t.slot(for: wd)
                         let c = store.course(t.courseID)
-                        let col = Color.course(c?.color ?? KBPalette.colors[0])
+                        let colHex = c?.color ?? KBPalette.colors[0]
+                        let col = Color.course(colHex)
                         VStack(spacing: 0) {
                             Text(s.timeText).font(.system(.caption2, weight: .semibold))
                                 .foregroundStyle(col)
@@ -316,7 +317,8 @@ struct ScheduleView: View {
     private func row(_ t: LessonTemplate, on day: Date) -> some View {
         let c = store.course(t.courseID)
         let s = t.slot(for: KBDate.cal.component(.weekday, from: day))
-        let col = Color.course(c?.color ?? KBPalette.colors[0])
+        let colHex = c?.color ?? KBPalette.colors[0]
+        let col = Color.course(colHex)
         return HStack(spacing: 12) {
             VStack(spacing: 3) {
                 Text(s.timeText)
@@ -336,7 +338,7 @@ struct ScheduleView: View {
                     .font(.system(.caption, weight: .semibold))
                     .foregroundStyle(KB.onAccent)
                     .padding(.horizontal, 13).padding(.vertical, 6)
-                    .background(LinearGradient(colors: [col.brightness(-0.06), col],
+                    .background(LinearGradient(colors: [Color.course(colHex, deep: true), col],
                                                startPoint: .top, endPoint: .bottom))
                     .clipShape(Capsule())
             }

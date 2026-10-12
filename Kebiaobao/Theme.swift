@@ -8,6 +8,8 @@ enum KB {
     }
 
     static let accent = dyn(0x37796D, 0x5FC4B3)
+    /// accent 的压暗端（渐变的顶/起点）。注意不能用 .brightness()——它返回 View，不能进 LinearGradient
+    static let accentDeep = dyn(0x347266, 0x59B8A8)
     static let accentSoft = dyn(0xE6F4F1, 0x1B3A35)
     static let bg = dyn(0xF7F7F9, 0x0B0B0D)
     static let card = dyn(0xFFFFFF, 0x1C1C1E)
@@ -27,7 +29,7 @@ enum KB {
 
     /// 强调色渐变（图标块 / 头像 / 主按钮）。顶端压暗，保证白/墨字在两端都过 4.5:1
     static var accentGradient: LinearGradient {
-        LinearGradient(colors: [accent.brightness(-0.06), accent],
+        LinearGradient(colors: [accentDeep, accent],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
@@ -50,19 +52,20 @@ extension Color {
 
     /// 课程色：作为文字/白字底色都要过 4.5:1
     /// 亮色向墨色混 46%，暗色向白混 28%（脚本按 10 色全表求解的最小值）
-    static func course(_ hex: UInt32) -> Color {
+    /// deep = true 再压暗一档，供渐变顶端用（亮 ×0.94，暗 ×0.96，两端都留 ≥5.6:1）
+    static func course(_ hex: UInt32, deep: Bool = false) -> Color {
         Color(UIColor { style in
             let c = UIColor(hex: hex)
             var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
             c.getRed(&r, green: &g, blue: &b, alpha: &a)
             if style.userInterfaceStyle == .dark {
-                return UIColor(red: r * 0.72 + 0.28,
-                               green: g * 0.72 + 0.28,
-                               blue: b * 0.72 + 0.28, alpha: 1)
+                let f: CGFloat = deep ? 0.6912 : 0.72
+                let o: CGFloat = deep ? 0.2688 : 0.28
+                return UIColor(red: r * f + o, green: g * f + o, blue: b * f + o, alpha: 1)
             }
-            return UIColor(red: r * 0.54 + 0.0198,
-                           green: g * 0.54 + 0.0198,
-                           blue: b * 0.54 + 0.0198, alpha: 1)
+            let f: CGFloat = deep ? 0.5076 : 0.54
+            let o: CGFloat = deep ? 0.018612 : 0.0198
+            return UIColor(red: r * f + o, green: g * f + o, blue: b * f + o, alpha: 1)
         })
     }
 
@@ -139,11 +142,13 @@ struct KBButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .foregroundStyle(filled ? KB.onAccent : tint)
-            .background(filled
-                        ? AnyShapeStyle(LinearGradient(colors: [tint.brightness(-0.06), tint],
-                                                       startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(KB.card))
+            .background(filled ? AnyShapeStyle(tint) : AnyShapeStyle(KB.card))
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(LinearGradient(colors: [.black.opacity(filled ? 0.10 : 0), .clear],
+                                         startPoint: .top, endPoint: .bottom))
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(filled ? Color.clear : KB.line, lineWidth: 1)
