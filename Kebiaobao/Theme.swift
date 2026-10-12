@@ -207,7 +207,15 @@ struct SectionHeader<Trailing: View>: View {
     let icon: String
     let title: String
     var tint: Color = KB.accent
-    @ViewBuilder var trailing: () -> Trailing
+    let trailing: () -> Trailing
+
+    init(icon: String, title: String, tint: Color = KB.accent,
+         @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.icon = icon
+        self.title = title
+        self.tint = tint
+        self.trailing = trailing
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -267,5 +275,31 @@ struct ColorRail: View {
         RoundedRectangle(cornerRadius: 2, style: .continuous)
             .fill(color)
             .frame(width: 3.5)
+    }
+}
+
+/// 空态提示：图标 + 标题 + 说明
+struct EmptyHint: View {
+    let icon: String
+    let title: String
+    var message: String? = nil
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .light))
+                .foregroundStyle(KB.accent.opacity(0.45))
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(KB.text.opacity(0.75))
+            if let message {
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundStyle(KB.dim)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
     }
 }

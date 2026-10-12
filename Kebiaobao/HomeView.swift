@@ -173,10 +173,7 @@ struct HomeView: View {
                         .font(.system(size: 12)).foregroundStyle(KB.dim)
                 }
                 if days.isEmpty {
-                    Text("近 3 天暂无排课")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 14)
+                    EmptyHint(icon: "calendar", title: "近 3 天暂无排课")
                 } else {
                     ForEach(days, id: \.self) { d in
                         dayBlock(d)
@@ -266,11 +263,11 @@ struct HomeView: View {
                 }
                 if list.isEmpty {
                     VStack(spacing: 10) {
-                        Text("还没有课程")
-                            .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        EmptyHint(icon: "book.closed", title: "还没有课程",
+                                  message: "添加后就能排课、打卡、看进度")
                         KBButton(title: "添加课程", icon: "plus") { sheet = .addCourse }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                 } else {
                     ForEach(list) { c in
                         NavigationLink { CourseDetailView(course: c) } label: {

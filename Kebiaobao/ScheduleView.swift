@@ -386,7 +386,7 @@ struct ManualEntryEditorView: View {
                     VStack(spacing: 14) {
                         Card {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("操作").font(.system(size: 15, weight: .semibold))
+                                SectionHeader(icon: "slider.horizontal.3", title: "操作")
                                 HStack(spacing: 8) {
                                     opChip(.consume, "打卡", KB.warn)
                                     opChip(.leave, "请假", KB.dim)
@@ -573,8 +573,8 @@ struct ManualEntryEditorView: View {
             ZStack {
                 KB.bg.ignoresSafeArea()
                 if store.courses(for: store.scope).isEmpty {
-                    Text("还没有课程\n请先在「课程管理」里新增").multilineTextAlignment(.center)
-                        .font(.system(size: 14)).foregroundStyle(KB.dim)
+                    EmptyHint(icon: "book.closed", title: "还没有课程",
+                              message: "请先在「课程管理」里新增")
                 } else {
                     List(store.courses(for: store.scope)) { c in
                         Button {
@@ -661,25 +661,45 @@ struct CheckInSheet: View {
                 KB.bg.ignoresSafeArea()
                 VStack(spacing: 14) {
                     let sl = template.slot(for: KBDate.cal.component(.weekday, from: date))
+                    let cur = store.course(template.courseID)
+                    let col = Color.course(cur?.color ?? KBPalette.colors[0])
+                    HStack(spacing: 12) {
+                        IconBadge(icon: "checkmark.circle.fill", tint: col, size: 40)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(cur?.name ?? "课程")
+                                .font(.system(size: 18, weight: .bold)).foregroundStyle(KB.text)
+                            Text("\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
+                                .font(.system(size: 12)).foregroundStyle(KB.dim)
+                        }
+                        Spacer()
+                        if let cur {
+                            VStack(spacing: 1) {
+                                Text("\(store.remaining(cur))")
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundStyle(store.remaining(cur) <= 3 ? KB.warn : col)
+                                Text("剩余").font(.system(size: 10)).foregroundStyle(KB.dim)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
                     Card {
                         VStack(spacing: 12) {
-                            InfoRow(label: "课程", value: store.course(template.courseID)?.name ?? "—")
                             InfoRow(label: "时间", value: "\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
                             InfoRow(label: "老师", value: sl.teacher.isEmpty ? "—" : sl.teacher)
-                            InfoRow(label: "剩余",
-                                    value: "\(store.course(template.courseID).map { store.remaining($0) } ?? 0) 节")
+                            InfoRow(label: "地点", value: sl.place.isEmpty ? "—" : sl.place)
                         }
                     }
                     Card {
                         VStack(spacing: 0) {
+                            SectionHeader(icon: "minus.circle.fill", title: "本次打卡", tint: col) {
+                                Text("扣 \(deduct) 课时")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(col)
+                            }
                             HStack {
-                                Text("本次打卡").font(.system(size: 15)).foregroundStyle(KB.text)
                                 Spacer()
-                                Stepper("\(deduct) 课时", value: $deduct, in: 1...10)
-                                    .labelsHidden()
-                                Text("\(deduct) 课时")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(KB.accent).frame(width: 62, alignment: .trailing)
+                                Stepper("", value: $deduct, in: 1...10).labelsHidden()
+                                Spacer()
                             }
                             .padding(.vertical, 8)
                             Divider()
@@ -688,7 +708,7 @@ struct CheckInSheet: View {
                     }
                     Card {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("课后小结").font(.system(size: 15)).foregroundStyle(KB.text)
+                            SectionHeader(icon: "text.bubble.fill", title: "课后小结")
                             TextField("本节学了什么、表现如何", text: $summary, axis: .vertical)
                                 .font(.system(size: 14))
                                 .lineLimit(3...6)
@@ -698,7 +718,7 @@ struct CheckInSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
-                    KBButton(title: "确认打卡 \(deduct) 课时", icon: "checkmark.circle.fill") {
+                    KBButton(title: "确认打卡 \(deduct) 课时", icon: "checkmark.circle.fill", tint: col) {
                         var t = template
                         t.deduct = deduct
                         switch store.checkIn(t, on: date) {

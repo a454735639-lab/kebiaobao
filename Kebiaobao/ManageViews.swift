@@ -17,13 +17,11 @@ struct CourseManageView: View {
         let attached = store.courses.filter { $0.poolID == p.id && !$0.archived }
         return Card {
             HStack(spacing: 12) {
+                IconBadge(icon: "creditcard.fill", size: 34)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                        Text("年卡")
-                            .font(.system(size: 10, weight: .medium)).foregroundStyle(.white)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(KB.accent).clipShape(Capsule())
+                        KBChip(text: "年卡", solid: true)
                     }
                     Text("\(store.babyNames(p.babyIDs)) · 共 \(p.total) 节 · 池内剩 \(left) 节")
                         .font(.system(size: 11)).foregroundStyle(KB.dim)
@@ -44,9 +42,10 @@ struct CourseManageView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     if store.courses.isEmpty {
-                        Text("还没有课程")
-                            .font(.system(size: 13)).foregroundStyle(KB.dim)
-                            .padding(.vertical, 24)
+                        Card {
+                            EmptyHint(icon: "book.closed", title: "还没有课程",
+                                      message: "点下面的「新增课程」开始记录")
+                        }
                     }
                     ForEach(store.courses.filter { !$0.archived && !$0.isPool }) { c in
                         Button { editing = c } label: { row(c) }
@@ -122,17 +121,14 @@ struct CourseManageView: View {
         // 挂年卡的课：显示池子余额，而不是本课已上数
         let left = store.remaining(c)
         let poolName = c.poolID.flatMap { store.course($0)?.name }
+        let col = Color.course(c.color)
         return Card {
             HStack(spacing: 12) {
+                IconBadge(icon: "book.closed.fill", tint: col, size: 34)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(c.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                        if !c.tag.isEmpty {
-                            Text(c.tag)
-                                .font(.system(size: 10)).foregroundStyle(KB.accent)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(KB.accentSoft).clipShape(Capsule())
-                        }
+                        if !c.tag.isEmpty { KBChip(text: c.tag, tint: col) }
                     }
                     if let pn = poolName {
                         Text("\(store.babyNames(c.babyIDs)) · 共用「\(pn)」 · 池内剩 \(left) 节")
@@ -202,12 +198,7 @@ struct BabyManageView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(b.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                        if current {
-                            Text("当前")
-                                .font(.system(size: 10)).foregroundStyle(KB.accent)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(KB.accentSoft).clipShape(Capsule())
-                        }
+                        if current { KBChip(text: "当前", solid: true) }
                     }
                     Text(b.birthday.map { "生日 \(KBDate.cnFull.string(from: $0)) · \(n) 门课程" }
                          ?? "\(n) 门课程")

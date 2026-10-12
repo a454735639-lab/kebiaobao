@@ -90,21 +90,21 @@ struct CourseDetailView: View {
         let total = pool.total
         let left = total - used
         let shared = pool.id != current.id
+        let col = Color.course(current.color)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(shared ? "课时进度 · 共用「\(pool.name)」" : "课时进度")
-                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                    Spacer()
+                SectionHeader(icon: "chart.pie.fill", title: shared ? "课时进度 · 共用「\(pool.name)」" : "课时进度",
+                              tint: col) {
                     Text("\(used)/\(total) 节")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(left <= 3 ? KB.warn : KB.accent)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(left <= 3 ? KB.warn : col)
                 }
                 KBProgress(value: used, total: total,
-                           color: left <= 0 ? KB.accent : (left <= 3 ? KB.warn : KB.accent))
+                           color: left <= 0 ? col : (left <= 3 ? KB.warn : col))
                 HStack {
                     Text("剩余 \(max(0, left)) 节")
-                        .font(.system(size: 13)).foregroundStyle(KB.dim)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(left <= 3 ? KB.warn : KB.text)
                     Spacer()
                     Text("剩余价值 ¥\(String(format: "%.2f", store.remainingValue(current.id)))")
                         .font(.system(size: 13)).foregroundStyle(KB.dim)
@@ -114,12 +114,16 @@ struct CourseDetailView: View {
                         .font(.system(size: 11)).foregroundStyle(KB.dim)
                 }
                 HStack(spacing: 10) {
-                    KBButton(title: "续费", filled: false) { renew = true }
+                    KBButton(title: "续费", filled: false, tint: col) { renew = true }
                     if !current.isPool {
-                        KBButton(title: "加排课", icon: "calendar.badge.plus") { addTemplate = true }
+                        KBButton(title: "加排课", icon: "calendar.badge.plus", tint: col) { addTemplate = true }
                     }
                 }
             }
+        }
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(col).frame(width: 4)
         }
     }
 
@@ -128,11 +132,10 @@ struct CourseDetailView: View {
         let attached = store.courses.filter { $0.poolID == current.id && !$0.archived }
         return Card {
             VStack(alignment: .leading, spacing: 10) {
-                Text("共用这张年卡的课程").font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(KB.text)
+                SectionHeader(icon: "link", title: "共用这张年卡的课程")
                 if attached.isEmpty {
-                    Text("还没课程挂在它下面。去「课程管理」把课程的「课时从哪扣」选到这张卡。")
-                        .font(.system(size: 12)).foregroundStyle(KB.dim)
+                    EmptyHint(icon: "link.badge.plus", title: "还没课程挂在它下面",
+                              message: "去「课程管理」把课程的「课时从哪扣」选到这张卡")
                 } else {
                     ForEach(attached) { c in
                         HStack {
@@ -187,7 +190,7 @@ struct CourseDetailView: View {
         let items = store.templates(for: current.id)
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text("排课").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                SectionHeader(icon: "calendar", title: "排课")
                 if items.isEmpty {
                     Text("暂无排课").font(.system(size: 13)).foregroundStyle(KB.dim)
                 } else {
@@ -233,16 +236,16 @@ struct CourseDetailView: View {
         let items = Array(store.entries(current.id).prefix(6))
         return Card {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("最近流水").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
-                    Spacer()
+                SectionHeader(icon: "list.bullet.rectangle", title: "最近流水") {
                     NavigationLink("全部") { LedgerListView(courseID: current.id) }
-                        .font(.system(size: 13))
+                        .font(.system(size: 13, weight: .medium))
                 }
                 if items.isEmpty {
-                    Text("暂无记录").font(.system(size: 13)).foregroundStyle(KB.dim)
+                    EmptyHint(icon: "tray", title: "暂无记录")
                 } else {
-                    ForEach(items) { e in LedgerRow(entry: e, showUndo: false) }
+                    VStack(spacing: 8) {
+                        ForEach(items) { e in LedgerRow(entry: e, showUndo: false) }
+                    }
                 }
             }
         }
@@ -323,7 +326,10 @@ struct LedgerRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        let col = Color.course(store.course(entry.courseID)?.color ?? KBPalette.colors[0])
+        return HStack(spacing: 0) {
+            ColorRail(color: col)
+            HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(store.course(entry.courseID)?.name ?? "课程")
                     .font(.system(size: 14, weight: .medium)).foregroundStyle(KB.text)
@@ -377,10 +383,10 @@ struct LedgerRow: View {
             Spacer()
             if entry.kind != .leave {
                 Text("\(entry.delta > 0 ? "+" : "")\(entry.delta)节")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(entry.delta > 0 ? KB.accent : KB.text)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(entry.delta > 0 ? KB.accent : KB.danger)
             } else {
-                Text("请假").font(.system(size: 13)).foregroundStyle(KB.warn)
+                KBChip(text: "请假", tint: KB.warn)
             }
             if showUndo {
                 Button {
@@ -390,8 +396,12 @@ struct LedgerRow: View {
                 }
                 .buttonStyle(.plain)
             }
+            }
         }
         .padding(.vertical, 9)
+        .padding(.leading, 9)
+        .background(col.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .alert("备注", isPresented: $editing) {
             TextField("如：调课到周六", text: $draft)
             Button("取消", role: .cancel) {}
@@ -520,17 +530,13 @@ struct LedgerListView: View {
                 .padding(.horizontal, 16)
                 if items.isEmpty {
                     Spacer()
-                    Text("暂无流水").font(.system(size: 14)).foregroundStyle(KB.dim)
+                    EmptyHint(icon: "tray", title: "暂无流水", message: "打卡或缴费后会出现在这里")
                     Spacer()
                 } else {
                     ScrollView {
-                        Card(padding: 0) {
-                            VStack(spacing: 0) {
-                                ForEach(items) { e in
-                                    LedgerRow(entry: e)
-                                        .padding(.horizontal, 16)
-                                    if e.id != items.last?.id { Divider().padding(.leading, 16) }
-                                }
+                        VStack(spacing: 8) {
+                            ForEach(items) { e in
+                                LedgerRow(entry: e)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -650,10 +656,7 @@ struct AnalyticsView: View {
                     if !slices.isEmpty {
                         Card {
                             VStack(alignment: .leading, spacing: 14) {
-                                HStack {
-                                    Text("上课进度").font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(KB.text)
-                                    Spacer()
+                                SectionHeader(icon: "chart.pie.fill", title: "上课进度") {
                                     Text("共 \(sliceTotal) 节")
                                         .font(.system(size: 12)).foregroundStyle(KB.dim)
                                 }
@@ -681,8 +684,7 @@ struct AnalyticsView: View {
                     if !kindSlices.isEmpty {
                         Card {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("消课类型").font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(KB.text)
+                                SectionHeader(icon: "chart.bar.fill", title: "消课类型")
                                 KindBar(slices: kindSlices)
                                 HStack(spacing: 14) {
                                     ForEach(kindSlices) { s in
@@ -700,9 +702,9 @@ struct AnalyticsView: View {
 
                     Card {
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("科目消耗统计").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                            SectionHeader(icon: "chart.bar.xaxis", title: "科目消耗统计")
                             if list.isEmpty {
-                                Text("暂无课程").font(.system(size: 13)).foregroundStyle(KB.dim)
+                                EmptyHint(icon: "book.closed", title: "暂无课程")
                             } else {
                                 ForEach(list) { c in
                                     let (used, sp) = store.usedAndSpent(c.id)
@@ -730,8 +732,12 @@ struct AnalyticsView: View {
                                         }
                                     }
                                     .padding(12)
-                                    .background(KB.bg)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .background(Color.course(c.color).opacity(0.07))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                            .fill(Color.course(c.color)).frame(width: 3.5)
+                                    }
                                 }
                             }
                         }
@@ -739,7 +745,7 @@ struct AnalyticsView: View {
 
                     Card {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("课程明细").font(.system(size: 15, weight: .semibold)).foregroundStyle(KB.text)
+                            SectionHeader(icon: "tablecells", title: "课程明细")
                             ForEach(list) { c in
                                 VStack(spacing: 0) {
                                     InfoRow(label: c.name, value: "剩余 \(store.remaining(c)) 节")

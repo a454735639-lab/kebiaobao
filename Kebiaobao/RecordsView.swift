@@ -104,21 +104,16 @@ struct RecordsView: View {
 
                 if items.isEmpty {
                     Spacer()
-                    Text("暂无记录").font(.system(size: 14)).foregroundStyle(KB.dim)
+                    EmptyHint(icon: "tray", title: "暂无记录", message: "打卡或缴费后会出现在这里")
                     Spacer()
                 } else {
                     ScrollView {
                         if tab == .checkIn {
                             groupedList
                         } else {
-                            Card(padding: 0) {
-                                VStack(spacing: 0) {
-                                    ForEach(items) { e in
-                                        LedgerRow(entry: e).padding(.horizontal, 16)
-                                        if e.id != items.last?.id {
-                                            Divider().padding(.leading, 16)
-                                        }
-                                    }
+                            VStack(spacing: 8) {
+                                ForEach(items) { e in
+                                    LedgerRow(entry: e)
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -142,6 +137,7 @@ struct RecordsView: View {
                 Card(padding: 0) {
                     VStack(spacing: 0) {
                         HStack {
+                            IconBadge(icon: "calendar", size: 22)
                             Text(dayLabel(k))
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(KB.text)
@@ -153,7 +149,8 @@ struct RecordsView: View {
                         .background(KB.bg)
                         Divider()
                         ForEach(dayItems) { e in
-                            LedgerRow(entry: e).padding(.horizontal, 16)
+                            LedgerRow(entry: e)
+                                .padding(.horizontal, 12)
                             if e.id != dayItems.last?.id {
                                 Divider().padding(.leading, 16)
                             }

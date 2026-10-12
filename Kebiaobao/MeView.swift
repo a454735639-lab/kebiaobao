@@ -309,12 +309,28 @@ struct MeView: View {
     @ViewBuilder
     private func group<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 13, weight: .medium)).foregroundStyle(KB.dim)
-                .padding(.leading, 4)
+            HStack(spacing: 6) {
+                Image(systemName: groupIcon(title))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(KB.accent.opacity(0.8))
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(KB.dim)
+            }
+            .padding(.leading, 4)
             Card(padding: 0) {
                 VStack(spacing: 0) { content() }
             }
+        }
+    }
+
+    private func groupIcon(_ title: String) -> String {
+        switch title {
+        case "数据管理": return "square.stack.3d.up.fill"
+        case "提醒": return "bell.badge.fill"
+        case "外观": return "paintbrush.fill"
+        case "备份与恢复": return "externaldrive.fill"
+        case "关于": return "info.circle.fill"
+        default: return "circle.fill"
         }
     }
 
@@ -368,8 +384,7 @@ struct MeView: View {
                                  @ViewBuilder dest: () -> D) -> some View {
         NavigationLink { dest() } label: {
             HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
+                IconBadge(icon: icon, size: 30)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
                     Text(sub).font(.system(size: 11)).foregroundStyle(KB.dim)
@@ -384,44 +399,12 @@ struct MeView: View {
     }
 
     private func navLedger() -> some View {
-        NavigationLink {
-            RecordsView()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "list.bullet.rectangle")
-                    .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("记录").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text("课时／缴费／打卡记录").font(.system(size: 11)).foregroundStyle(KB.dim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(KB.line)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 13)
-        }
-        .buttonStyle(.plain)
+        navRow("list.bullet.rectangle", "记录", "课时／缴费／打卡记录") { RecordsView() }
     }
 
     @ViewBuilder
     private func navAnalytics() -> some View {
-        NavigationLink {
-            AnalyticsView()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "chart.bar.xaxis")
-                    .font(.system(size: 15)).foregroundStyle(KB.accent).frame(width: 26)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("数据分析").font(.system(size: 15, weight: .medium)).foregroundStyle(KB.text)
-                    Text("消耗统计与支出估算").font(.system(size: 11)).foregroundStyle(KB.dim)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(KB.line)
-            }
-            .padding(.horizontal, 16).padding(.vertical, 13)
-        }
-        .buttonStyle(.plain)
+        navRow("chart.bar.xaxis", "数据分析", "消耗统计与支出估算") { AnalyticsView() }
     }
 
     private var importSheet: some View {
