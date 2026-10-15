@@ -373,6 +373,9 @@ struct ManualEntryEditorView: View {
     /// 共用年卡：这条记录算在哪个宝宝头上
     @State private var ownerBabyID: UUID?
     @State private var alert: AlertKind?
+    @FocusState private var focus: Field?
+
+    private enum Field: Hashable { case lessons, price, note }
 
     private enum AlertKind: Identifiable {
         case duplicate, expired
@@ -453,6 +456,7 @@ struct ManualEntryEditorView: View {
                                     stepBtn("minus", -1)
                                     TextField("1", text: $lessonsText)
                                         .keyboardType(.numberPad)
+                                        .focused($focus, equals: .lessons)
                                         .font(.system(.title3, design: .rounded, weight: .bold))
                                         .multilineTextAlignment(.center)
                                         .frame(minWidth: 56)
@@ -477,6 +481,7 @@ struct ManualEntryEditorView: View {
                                         Image(systemName: "yensign").foregroundStyle(KB.dim)
                                         TextField("沿用原单价", text: $price)
                                             .keyboardType(.decimalPad)
+                                            .focused($focus, equals: .price)
                                             .font(.system(.subheadline))
                                             .multilineTextAlignment(.trailing)
                                     }
@@ -490,16 +495,18 @@ struct ManualEntryEditorView: View {
                                 Spacer()
                                 TextField(Store.manualDefaultNote(op), text: $note)
                                     .font(.system(.subheadline))
+                                    .focused($focus, equals: .note)
+                                    .submitLabel(.done)
+                                    .onSubmit { focus = nil }
                                     .multilineTextAlignment(.trailing)
                                     .frame(maxWidth: 200)
                             }
                         }
-                        KBButton(title: "保存", icon: "checkmark") { save() }
-                            .disabled(courseID == nil)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 16)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 if let id = courseID {
                     Text(currentCourseText)
                         .font(.system(.caption)).foregroundStyle(KB.dim)
@@ -530,6 +537,19 @@ struct ManualEntryEditorView: View {
                     } else if let b = store.scope, store.courses(for: b).isEmpty == false {
                         showPicker = true
                     }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                KBButton(title: "保存", icon: "checkmark") { focus = nil; save() }
+                    .disabled(courseID == nil)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.bar)
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { focus = nil }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -666,6 +686,9 @@ struct CheckInSheet: View {
     @State private var note = "正常上课"
     @State private var summary = ""
     @State private var alert: AlertKind?
+    @FocusState private var focus: Field?
+
+    private enum Field: Hashable { case note, summary }
 
     private enum AlertKind: Identifiable {
         case duplicate, expired
@@ -673,88 +696,114 @@ struct CheckInSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        let sl = template.slot(for: KBDate.cal.component(.weekday, from: date))
+        let cur = store.course(template.courseID)
+        let col = Color.course(cur?.color ?? KBPalette.colors[0])
+        return NavigationStack {
             ZStack {
                 KB.bg.ignoresSafeArea()
-                VStack(spacing: 14) {
-                    let sl = template.slot(for: KBDate.cal.component(.weekday, from: date))
-                    let cur = store.course(template.courseID)
-                    let col = Color.course(cur?.color ?? KBPalette.colors[0])
-                    HStack(spacing: 12) {
-                        IconBadge(icon: "checkmark.circle.fill", tint: col, size: 40)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(cur?.name ?? "课程")
-                                .font(.system(.title3, weight: .bold)).foregroundStyle(KB.text)
-                            Text("\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
-                                .font(.system(.caption)).foregroundStyle(KB.dim)
-                        }
-                        Spacer()
-                        if let cur {
-                            VStack(spacing: 1) {
-                                Text("\(store.remaining(cur))")
-                                    .font(.system(.title2, design: .rounded, weight: .bold))
-                                    .foregroundStyle(store.remaining(cur) <= 3 ? KB.warn : col)
-                                Text("剩余").font(.system(.caption2)).foregroundStyle(KB.dim)
+                ScrollView {
+                    VStack(spacing: 14) {
+                        HStack(spacing: 12) {
+                            IconBadge(icon: "checkmark.circle.fill", tint: col, size: 40)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(cur?.name ?? "课程")
+                                    .font(.system(.title3, weight: .bold)).foregroundStyle(KB.text)
+                                Text("\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
+                                    .font(.system(.caption)).foregroundStyle(KB.dim)
+                            }
+                            Spacer()
+                            if let cur {
+                                VStack(spacing: 1) {
+                                    Text("\(store.remaining(cur))")
+                                        .font(.system(.title2, design: .rounded, weight: .bold))
+                                        .foregroundStyle(store.remaining(cur) <= 3 ? KB.warn : col)
+                                    Text("剩余").font(.system(.caption2)).foregroundStyle(KB.dim)
+                                }
                             }
                         }
-                    }
-                    .padding(.horizontal, 4)
-                    Card {
-                        VStack(spacing: 12) {
-                            InfoRow(label: "时间", value: "\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
-                            InfoRow(label: "老师", value: sl.teacher.isEmpty ? "—" : sl.teacher)
-                            InfoRow(label: "地点", value: sl.place.isEmpty ? "—" : sl.place)
-                        }
-                    }
-                    Card {
-                        VStack(spacing: 0) {
-                            SectionHeader(icon: "minus.circle.fill", title: "本次打卡", tint: col) {
-                                Text("扣 \(deduct) 课时")
-                                    .font(.system(.caption, design: .rounded, weight: .bold))
-                                    .foregroundStyle(col)
+                        .padding(.horizontal, 4)
+                        Card {
+                            VStack(spacing: 12) {
+                                InfoRow(label: "时间", value: "\(KBDate.mdhm.string(from: date).prefix(10)) \(sl.timeText)")
+                                InfoRow(label: "老师", value: sl.teacher.isEmpty ? "—" : sl.teacher)
+                                InfoRow(label: "地点", value: sl.place.isEmpty ? "—" : sl.place)
                             }
-                            HStack {
-                                Spacer()
-                                Stepper("", value: $deduct, in: 1...10).labelsHidden()
-                                Spacer()
+                        }
+                        Card {
+                            VStack(spacing: 0) {
+                                SectionHeader(icon: "minus.circle.fill", title: "本次打卡", tint: col) {
+                                    Text("扣 \(deduct) 课时")
+                                        .font(.system(.caption, design: .rounded, weight: .bold))
+                                        .foregroundStyle(col)
+                                }
+                                HStack {
+                                    Spacer()
+                                    Stepper("", value: $deduct, in: 1...10).labelsHidden()
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                                Divider()
+                                HStack {
+                                    Text("备注")
+                                        .font(.system(.subheadline))
+                                        .foregroundStyle(KB.text)
+                                        .frame(width: 96, alignment: .leading)
+                                    TextField("正常上课", text: $note)
+                                        .font(.system(.subheadline))
+                                        .focused($focus, equals: .note)
+                                        .submitLabel(.done)
+                                        .onSubmit { focus = nil }
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                .padding(.vertical, 11)
                             }
-                            .padding(.vertical, 8)
-                            Divider()
-                            FieldRow(label: "备注", text: $note, placeholder: "正常上课")
                         }
-                    }
-                    Card {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionHeader(icon: "text.bubble.fill", title: "课后小结")
-                            TextField("本节学了什么、表现如何", text: $summary, axis: .vertical)
-                                .font(.system(.subheadline))
-                                .lineLimit(3...6)
-                                .textFieldStyle(.plain)
-                                .padding(10)
-                                .background(KB.bg)
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        Card {
+                            VStack(alignment: .leading, spacing: 10) {
+                                SectionHeader(icon: "text.bubble.fill", title: "课后小结")
+                                TextField("本节学了什么、表现如何", text: $summary, axis: .vertical)
+                                    .font(.system(.subheadline))
+                                    .focused($focus, equals: .summary)
+                                    .lineLimit(3...6)
+                                    .textFieldStyle(.plain)
+                                    .padding(10)
+                                    .background(KB.bg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
                         }
+                        .padding(.bottom, 8)
                     }
-                    KBButton(title: "确认打卡 \(deduct) 课时", icon: "checkmark.circle.fill", tint: col) {
-                        var t = template
-                        t.deduct = deduct
-                        switch store.checkIn(t, on: date) {
-                        case .ok:
-                            store.updateLastEntry(note: note, summary: summary)
-                            dismiss()
-                        case .duplicate: alert = .duplicate
-                        case .expired: alert = .expired
-                        }
-                    }
-                    Spacer()
+                    .padding(16)
                 }
-                .padding(16)
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .safeAreaInset(edge: .bottom) {
+                KBButton(title: "确认打卡 \(deduct) 课时", icon: "checkmark.circle.fill", tint: col) {
+                    focus = nil
+                    var t = template
+                    t.deduct = deduct
+                    switch store.checkIn(t, on: date) {
+                    case .ok:
+                        store.updateLastEntry(note: note, summary: summary)
+                        dismiss()
+                    case .duplicate: alert = .duplicate
+                    case .expired: alert = .expired
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.bar)
             }
             .navigationTitle("课时打卡")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("完成") { focus = nil }
                 }
             }
             .alert(item: $alert) { kind in
