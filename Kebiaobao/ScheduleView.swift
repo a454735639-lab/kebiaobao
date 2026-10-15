@@ -699,7 +699,7 @@ struct CheckInSheet: View {
         let sl = template.slot(for: KBDate.cal.component(.weekday, from: date))
         let cur = store.course(template.courseID)
         let col = Color.course(cur?.color ?? KBPalette.colors[0])
-        return NavigationStack {
+        NavigationStack {
             ZStack {
                 KB.bg.ignoresSafeArea()
                 ScrollView {
