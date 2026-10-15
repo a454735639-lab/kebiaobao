@@ -55,7 +55,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CURRENT_PROJECT_VERSION="$((GITHUB_RUN_NUMBER + 100))" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
